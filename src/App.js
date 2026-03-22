@@ -360,6 +360,18 @@ function getStatePrograms(data) {
         link: "https://www.revenue.pa.gov/IncentivesCreditsPrograms/PropertyTaxRentRebateProgram/Pages/default.aspx"
       });
     }
+
+    if (age >= 65) {
+      items.push({
+        title: "PA Homestead / Farmstead Exclusion",
+        likelihood: "Possible",
+        type: "Pennsylvania",
+        description: "Property tax relief that may reduce the assessed value used to calculate school property taxes on an eligible primary residence. This is different from the cash rebate program.",
+        docs: "Proof the home is your primary residence, parcel or property information, homeowner information, county assessment application.",
+        link: "https://dced.pa.gov/local-government/property-tax-relief-homestead-exclusion/"
+      });
+    }
+
     if (age >= 65 && income <= 33000) {
       items.push({
         title: "PACE / PACENET",
