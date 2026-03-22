@@ -32,12 +32,28 @@ const STATES = {
     "unclaimed": "https://www.fltreasurehunt.gov/"
   }
 };
-
 const ALL_STATES = [
  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA",
  "ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK",
  "OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"
 ];
+
+const WHY = {
+  citizenStatus: "Why this matters: Many programs require U.S. citizenship or qualified status.",
+  needsHelpDailyLiving: "Why this matters: Helps find programs that pay for in-home care or assistance.",
+  needsSupervision: "Why this matters: Some programs require supervision needs to qualify for care services.",
+  cannotLiveAlone: "Why this matters: This helps determine eligibility for housing or care programs like Domiciliary Care.",
+  nursingFacilityLevelCare: "Why this matters: Required for certain programs that provide long-term care at home instead of a nursing home.",
+  medicareA: "Why this matters: Determines if you may qualify for programs that lower Medicare costs.",
+  medicareB: "Why this matters: Determines if you may qualify for programs that lower Medicare costs.",
+  medicareD: "Why this matters: Helps find prescription savings programs.",
+  medicaid: "Why this matters: Some programs only apply if you already have Medicaid.",
+  prescriptionCosts: "Why this matters: Helps find programs that reduce medication expenses.",
+  retired: "Why this matters: Required for reduced vehicle registration fees in Pennsylvania.",
+  ownsVehicle: "Why this matters: Needed to check eligibility for vehicle-related savings.",
+  checkingBalance: "Why this matters: Some programs have resource or asset limits.",
+  savingsBalance: "Why this matters: Some programs have resource or asset limits."
+};
 
 const emptyForm = {
   personName: "",
@@ -46,11 +62,16 @@ const emptyForm = {
   maritalStatus: "single",
   disability: "no",
   veteran: "no",
+  citizenStatus: "citizen",
   state: "PA",
   county: "",
   schoolDistrict: "",
   householdSize: "1",
   livesAlone: "yes",
+  needsSupervision: "no",
+  cannotLiveAlone: "no",
+  needsHelpDailyLiving: "no",
+  nursingFacilityLevelCare: "no",
   housing: "rent",
   primaryResidence: "yes",
   monthlyRentMortgage: "",
@@ -109,7 +130,11 @@ function totalAssets(f) {
 }
 
 function completeness(f) {
-  const keys = ["age","state","householdSize","housing","primaryResidence","monthlySocialSecurity","monthlySSI","monthlySSDI","checkingBalance","savingsBalance","disability"];
+  const keys = [
+    "age","state","householdSize","housing","primaryResidence","monthlySocialSecurity","monthlySSI","monthlySSDI",
+    "checkingBalance","savingsBalance","disability","citizenStatus","medicareA","medicareB","medicareD",
+    "needsHelpDailyLiving","needsSupervision","cannotLiveAlone","nursingFacilityLevelCare"
+  ];
   let count = 0;
   keys.forEach(k => { if (String(f[k] ?? "").trim() !== "") count += 1; });
   return count / keys.length;
@@ -126,6 +151,85 @@ function add(items, name, type, category, description, docs, link, score) {
   items.push({ name, type, category, description, docs, link, score });
 }
 
+function missingInfoPrompts(f) {
+  const prompts = [];
+  const age = Number(f.age || 0);
+  const medicareRelevant = age >= 65 || f.disability === "yes" || f.medicareA === "yes" || f.medicareB === "yes";
+  const careRelevant = f.disability === "yes" || age >= 60 || f.longTermCare === "yes";
+  const paRelevant = f.state === "PA";
+
+  const addPrompt = (field, text) => {
+    if (String(f[field] ?? "").trim() === "") prompts.push(text);
+  };
+
+  addPrompt("age", "Add age or date of birth to improve nearly every result.");
+  addPrompt("householdSize", "Add household size to tighten SNAP screening.");
+  addPrompt("monthlySocialSecurity", "Enter Social Security income, even if it is $0.");
+  addPrompt("monthlySSI", "Enter SSI income, even if it is $0.");
+  addPrompt("monthlySSDI", "Enter SSDI income, even if it is $0.");
+  addPrompt("checkingBalance", "Enter checking balance to improve SSI, Medicaid, and Medicare Savings screening.");
+  addPrompt("savingsBalance", "Enter savings balance to improve SSI, Medicaid, and Extra Help screening.");
+  if (String(f.citizenStatus ?? "").trim() === "" || f.citizenStatus === "other") prompts.push("Confirm citizenship or qualified status to improve SNAP, SSI, and Medicaid screening.");
+  if (medicareRelevant) {
+    if (String(f.medicareA ?? "").trim() === "") prompts.push("Answer Medicare Part A to improve Medicare Savings screening.");
+    if (String(f.medicareB ?? "").trim() === "") prompts.push("Answer Medicare Part B to improve Medicare Savings screening.");
+    if (String(f.medicareD ?? "").trim() === "") prompts.push("Answer Medicare Part D to improve Extra Help screening.");
+    addPrompt("prescriptionCosts", "Enter prescription costs to improve Extra Help and prescription savings results.");
+  }
+  if (careRelevant) {
+    if (String(f.needsHelpDailyLiving ?? "").trim() === "" || f.needsHelpDailyLiving === "no") prompts.push("If help with daily living is needed, answer that to improve home-care and CHC results.");
+    if (String(f.needsSupervision ?? "").trim() === "" || f.needsSupervision === "no") prompts.push("If supervision is needed, answer that to improve Domiciliary Care results.");
+    if (String(f.cannotLiveAlone ?? "").trim() === "" || f.cannotLiveAlone === "no") prompts.push("If the person cannot live alone, answer that to improve supportive-living results.");
+    if (String(f.nursingFacilityLevelCare ?? "").trim() === "" || f.nursingFacilityLevelCare === "no") prompts.push("If nursing-facility level of care applies, answer that to improve CHC and waiver results.");
+  }
+  if (paRelevant && f.housing === "own") {
+    addPrompt("propertyTaxesPaid", "Enter yearly property taxes paid to improve PA tax-relief results.");
+    addPrompt("schoolDistrict", "Enter school district to improve PA Homestead / Farmstead Exclusion guidance.");
+  }
+  if (paRelevant) {
+    if (f.retired === "yes" && String(f.ownsVehicle ?? "").trim() === "") prompts.push("Answer vehicle ownership to improve PA retired registration results.");
+    if (f.ownsVehicle === "yes" && String(f.retired ?? "").trim() === "") prompts.push("Answer retired status to improve PA retired registration results.");
+  }
+
+  return prompts.slice(0, 8);
+}
+
+function autoFlags(f, results) {
+  const flags = [];
+  const income = totalIncome(f);
+  const assets = totalAssets(f);
+  const age = Number(f.age || 0);
+
+  if (f.state === "PA" && age >= 65 && f.housing === "own" && f.primaryResidence === "yes" && Number(f.propertyTaxesPaid || 0) > 0) {
+    flags.push("PA homeowner: check both PA Property Tax / Rent Rebate and PA Homestead / Farmstead Exclusion.");
+  }
+  if ((age >= 65 || f.disability === "yes") && income <= 1971 && ((f.maritalStatus === "married" && assets <= 3000) || (f.maritalStatus !== "married" && assets <= 2000))) {
+    flags.push("SSI looks especially strong based on income, age/disability, and assets entered.");
+  }
+  if (f.disability === "yes" && income <= 2200 && assets <= 10000) {
+    flags.push("Disability-based Medicaid looks especially strong based on the information entered.");
+  }
+  if ((f.medicareA === "yes" || f.medicareB === "yes") && income <= 2200 && assets <= 10000) {
+    flags.push("Medicare Savings Programs look especially strong based on Medicare status, income, and assets.");
+  }
+  if ((f.medicareD === "yes" || f.medicareA === "yes" || f.medicareB === "yes") && income <= 2500 && Number(f.prescriptionCosts || 0) > 0) {
+    flags.push("Extra Help for Prescriptions looks especially strong based on Medicare and prescription costs.");
+  }
+  if (f.state === "PA" && f.retired === "yes" && f.ownsVehicle === "yes") {
+    flags.push("PA retired vehicle registration reduction is worth checking now.");
+  }
+  if (f.state === "PA" && (f.needsSupervision === "yes" || f.cannotLiveAlone === "yes")) {
+    flags.push("PA Domiciliary Care may be a strong fit because supervision or inability to live alone was selected.");
+  }
+  if (f.state === "PA" && f.medicaid === "yes" && (f.medicareA === "yes" || f.medicareB === "yes") && (f.longTermCare === "yes" || f.nursingFacilityLevelCare === "yes")) {
+    flags.push("PA Community HealthChoices may be a strong fit because Medicaid, Medicare, and care-need details were selected.");
+  }
+  if (results.filter(r => r.label === "Definitely worth applying").length >= 2) {
+    flags.push("Multiple programs scored at the highest level. Review those first.");
+  }
+  return flags;
+}
+
 function buildResults(f) {
   const age = Number(f.age || 0);
   const income = totalIncome(f);
@@ -138,73 +242,39 @@ function buildResults(f) {
   if (age >= 65 || f.disability === "yes") ssiScore += 35;
   if (income <= 1971) ssiScore += 40;
   if ((f.maritalStatus === "married" && assets <= 3000) || (f.maritalStatus !== "married" && assets <= 2000)) ssiScore += 20;
-  ssiScore += 5;
-  add(items, "SSI", "Federal", "Cash / income", "Monthly cash assistance for older adults and people with disabilities who meet income and resource rules.", "Photo ID, Social Security number, income proof, bank balances, housing costs.", "https://www.ssa.gov/ssi", ssiScore);
-
-  let ssdiScore = 0;
-  if (f.disability === "yes") ssdiScore += 45;
-  if (Number(f.monthlySSDI || 0) > 0) ssdiScore += 40;
-  if (age < 65) ssdiScore += 10;
-  if (Number(f.monthlyWages || 0) < 1700) ssdiScore += 5;
-  if (ssdiScore > 0) add(items, "SSDI", "Federal", "Cash / income", "Disability income for people with qualifying work history and disability status.", "Work history, medical records, diagnosis details, provider information, income information.", "https://www.ssa.gov/benefits/disability/", ssdiScore);
+  if (f.citizenStatus !== "other") ssiScore += 5;
+  add(items, "SSI", "Federal", "Cash / income", "Monthly cash assistance for older adults and people with disabilities who meet income and resource rules.", "Photo ID, Social Security number, citizenship or qualified status, income proof, bank balances, housing costs.", "https://www.ssa.gov/ssi", ssiScore);
 
   let snapScore = 0;
   const snapLimit = 2550 + (household - 1) * 900;
   if (income <= snapLimit) snapScore += 70;
   if (f.housing === "rent" || Number(f.monthlyRentMortgage || 0) > 0) snapScore += 15;
   if (f.utilitiesSeparate === "yes") snapScore += 10;
-  snapScore += 5;
-  add(items, "SNAP", "Federal", "Food", "Monthly grocery help based on income and household size.", "ID, income proof, rent or mortgage, utility bills, household members.", "https://www.fns.usda.gov/snap", snapScore);
+  if (f.citizenStatus !== "other") snapScore += 5;
+  add(items, "SNAP", "Federal", "Food", "Monthly grocery help based on income and household size.", "ID, citizenship or qualified status, income proof, rent or mortgage, utility bills, household members.", "https://www.fns.usda.gov/snap", snapScore);
 
-  let liheapScore = 0;
-  if (income <= 3000) liheapScore += 60;
-  if (Number(f.monthlyRentMortgage || 0) > 0 || Number(f.propertyTaxesPaid || 0) > 0) liheapScore += 15;
-  if (f.utilitiesSeparate === "yes") liheapScore += 20;
-  liheapScore += 5;
-  add(items, "LIHEAP", "Federal / State", "Utilities", "Help with heating and cooling bills.", "Utility bill, ID, income proof, household list.", "https://www.acf.hhs.gov/ocs/low-income-home-energy-assistance-program-liheap", liheapScore);
-
-  if (f.housing === "rent") {
-    let sec8 = 0;
-    if (income <= 3000) sec8 += 40;
-    if (Number(f.monthlyRentMortgage || 0) > 0) sec8 += 15;
-    if (f.disability === "yes" || age >= 62) sec8 += 10;
-    sec8 += 35;
-    add(items, "Housing Choice Voucher / Section 8", "Federal / Local", "Housing", "Rent assistance through local housing authorities.", "ID, income proof, rent amount, lease, household information.", "https://www.hud.gov/topics/housing_choice_voucher_program_section_8", sec8);
-  }
+  let medicaidScore = 0;
+  if (f.disability === "yes" || age >= 65) medicaidScore += 35;
+  if (income <= 2200) medicaidScore += 30;
+  if (assets <= 10000) medicaidScore += 20;
+  if (f.citizenStatus !== "other") medicaidScore += 5;
+  if (f.longTermCare === "yes" || f.needsHelpDailyLiving === "yes") medicaidScore += 10;
+  add(items, "Medicaid (Disability Path)", "Federal / State", "Medical / disability support", "Medical coverage pathway commonly used by younger people with disabilities and adults with care needs.", "ID, citizenship or qualified status, medical records, income proof, bank balances, disability information.", STATES[f.state]?.portal || "https://www.medicaid.gov/", medicaidScore);
 
   if (age >= 65 || f.disability === "yes" || f.medicareA === "yes" || f.medicareB === "yes") {
     let msp = 0;
     if (f.medicareA === "yes" || f.medicareB === "yes") msp += 30;
     if (income <= 2200) msp += 40;
     if (assets <= 10000) msp += 20;
-    if (age >= 65 || f.disability === "yes") msp += 10;
-    add(items, "Medicare Savings Programs", "Federal / State", "Medical / prescription savings", "Help paying Medicare premiums and sometimes deductibles or copays.", "Medicare card, ID, income proof, bank balances.", "https://www.medicare.gov/basics/costs/help/medicare-savings-programs", msp);
+    if (f.citizenStatus !== "other") msp += 10;
+    add(items, "Medicare Savings Programs", "Federal / State", "Medical / prescription savings", "Help paying Medicare premiums and sometimes deductibles or copays.", "Medicare card, ID, citizenship or qualified status, income proof, bank balances.", "https://www.medicare.gov/basics/costs/help/medicare-savings-programs", msp);
 
     let extraHelp = 0;
     if (f.medicareD === "yes" || f.medicareA === "yes" || f.medicareB === "yes") extraHelp += 25;
     if (income <= 2500) extraHelp += 40;
     if (assets <= 18000) extraHelp += 20;
     if (Number(f.prescriptionCosts || 0) > 0) extraHelp += 15;
-    add(items, "Extra Help for Prescriptions", "Federal", "Medical / prescription savings", "Help paying Medicare Part D prescription costs.", "Medicare information, prescription list, income and resource details.", "https://www.ssa.gov/extrahelp", extraHelp);
-  }
-
-  if (f.disability === "yes") {
-    let medicaidDis = 0;
-    medicaidDis += 40;
-    if (income <= 2200) medicaidDis += 30;
-    if (assets <= 10000) medicaidDis += 20;
-    if (f.longTermCare === "yes") medicaidDis += 10;
-    add(items, "Medicaid (Disability Path)", "Federal / State", "Medical / disability support", "Medical coverage pathway commonly used by younger people with disabilities and adults with care needs.", "ID, medical records, income proof, bank balances, disability information.", STATES[f.state]?.portal || "https://www.medicaid.gov/", medicaidDis);
-
-    let hcbs = 0;
-    hcbs += 40;
-    if (f.longTermCare === "yes") hcbs += 25;
-    if (f.medicaid === "yes") hcbs += 20;
-    if (Number(f.prescriptionCosts || 0) > 0) hcbs += 15;
-    add(items, "HCBS Waivers / Home Care Support", "State", "Medical / disability support", "Home and community-based services that may help with care at home instead of institutional care.", "Medical records, care needs, Medicaid details, physician information.", STATES[f.state]?.portal || "https://www.medicaid.gov/medicaid/home-community-based-services/home-community-based-services-authorities/index.html", hcbs);
-
-    add(items, "ABLE Account", "Federal / State", "Financial planning", "Tax-advantaged savings account for eligible people with disabilities.", "Disability onset information, identification, banking information.", "https://www.ablenrc.org/", 85);
-    add(items, "Ticket to Work", "Federal", "Work support", "Employment support for people receiving disability benefits.", "SSDI or SSI benefit information, work goals.", "https://choosework.ssa.gov/", 75);
+    add(items, "Extra Help for Prescriptions", "Federal", "Medical / prescription savings", "Help paying Medicare Part D prescription costs.", "Medicare information, citizenship or qualified status, prescription list, income and resource details.", "https://www.ssa.gov/extrahelp", extraHelp);
   }
 
   const statePortal = STATES[f.state]?.portal || "https://www.benefits.gov/benefit-finder";
@@ -213,26 +283,27 @@ function buildResults(f) {
   add(items, `${f.state} Unclaimed Money`, "State", "Unclaimed money", "Search for unclaimed money, dormant accounts, old refunds, or property owed to you.", "Your name and current or past address.", stateUnclaimed, 100);
 
   if (f.state === "PA") {
-    let ptrr = 0;
-    if (age >= 65 || f.disability === "yes") ptrr += 25;
-    if (f.primaryResidence === "yes") ptrr += 15;
-    if (income * 12 <= 35000) ptrr += 35;
-    if (f.housing === "rent" || Number(f.propertyTaxesPaid || 0) > 0) ptrr += 15;
-    add(items, "PA Property Tax / Rent Rebate", "Pennsylvania", "Cash / tax relief", "Annual rebate for eligible older adults and some people with disabilities.", "Rent certificate or property tax proof, income documents, ID.", "https://www.revenue.pa.gov/IncentivesCreditsPrograms/PropertyTaxRentRebateProgram/Pages/default.aspx", ptrr);
+    let domiciliary = 0;
+    if (f.needsSupervision === "yes") domiciliary += 30;
+    if (f.cannotLiveAlone === "yes") domiciliary += 30;
+    if (f.longTermCare === "yes" || f.needsHelpDailyLiving === "yes") domiciliary += 20;
+    if (income <= 3500) domiciliary += 10;
+    if (f.citizenStatus !== "other") domiciliary += 10;
+    add(items, "PA Domiciliary Care", "Pennsylvania", "Housing / supportive living", "Family-like home setting for adults who need supervision and support and cannot live alone.", "Functional needs, supervision needs, inability to live alone, income details, contact information, care assessment.", "https://www.pa.gov/agencies/aging/aging-programs-and-services/housing-programs-for-older-adults", domiciliary);
 
-    let homestead = 0;
-    if (f.primaryResidence === "yes") homestead += 40;
-    if (f.housing === "own") homestead += 25;
-    if (f.schoolDistrict) homestead += 15;
-    if (Number(f.propertyTaxesPaid || 0) > 0) homestead += 20;
-    add(items, "PA Homestead / Farmstead Exclusion", "Pennsylvania", "Cash / tax relief", "Property tax relief that may reduce the assessed value used to calculate school property taxes on an eligible primary residence. This is different from the cash rebate program.", "Proof the home is your primary residence, parcel or property information, homeowner information, county assessment application.", "https://dced.pa.gov/local-government/property-tax-relief-homestead-exclusion/", homestead);
+    let olderDisabledMedicaid = 0;
+    if (f.disability === "yes" || age >= 65) olderDisabledMedicaid += 40;
+    if (income <= 2200) olderDisabledMedicaid += 30;
+    if (assets <= 10000) olderDisabledMedicaid += 20;
+    if (f.citizenStatus !== "other") olderDisabledMedicaid += 10;
+    add(items, "PA Medicaid for Older Adults and People with Disabilities", "Pennsylvania", "Medical / disability support", "Pennsylvania Medicaid category for older adults and people with disabilities.", "Income proof, bank balances, ID, citizenship or qualified status, medical or disability information.", "https://www.pa.gov/agencies/dhs/resources/aging-physical-disabilities/medicaid-older-people-and-people-with-disabilities", olderDisabledMedicaid);
 
-    let pace = 0;
-    if (age >= 65) pace += 25;
-    if (income * 12 <= 33000) pace += 35;
-    if (f.medicareD === "yes" || Number(f.prescriptionCosts || 0) > 0) pace += 20;
-    pace += 20;
-    add(items, "PACE / PACENET", "Pennsylvania", "Medical / prescription savings", "Prescription help for eligible Pennsylvania seniors.", "Prescription list, Medicare card, income proof, ID.", "https://www.aging.pa.gov/aging-services/prescription-assistance/Pages/default.aspx", pace);
+    let chc = 0;
+    if (f.medicaid === "yes" && (f.medicareA === "yes" || f.medicareB === "yes")) chc += 45;
+    if (f.disability === "yes" && age >= 21) chc += 20;
+    if (f.longTermCare === "yes" || f.nursingFacilityLevelCare === "yes") chc += 25;
+    if (f.needsHelpDailyLiving === "yes") chc += 10;
+    add(items, "PA Community HealthChoices (CHC)", "Pennsylvania", "Care at home / disability support", "Managed long-term services and supports for dual-eligible adults and adults with physical disabilities.", "Medicaid and Medicare information, care needs, nursing facility level of care if applicable, medical records.", "https://www.pa.gov/agencies/dhs/resources/medicaid/chc/chc-providers", chc);
 
     let vehicle = 0;
     if (f.retired === "yes") vehicle += 35;
@@ -242,46 +313,6 @@ function buildResults(f) {
     add(items, "PA Retired Person Vehicle Registration", "Pennsylvania", "Transportation savings", "Reduced retired-status vehicle registration fee for eligible retired Pennsylvanians.", "Vehicle registration, proof of retirement or retired status, income information, PennDOT form.", "https://www.pa.gov/services/dmv/apply-for-retired-status-vehicle-registration", vehicle);
 
     add(items, "PA MEDI", "Pennsylvania", "Medical / prescription savings", "Free Medicare counseling that can help compare plans, avoid penalties, and reduce out-of-pocket costs.", "Medicare card, current plan information, medication list.", "https://www.pa.gov/agencies/aging/aging-programs-and-services/pa-medi-medicare-counseling", 100);
-
-    let optionsScore = 0;
-    if (age >= 60) optionsScore += 35;
-    if (f.longTermCare === "yes") optionsScore += 35;
-    if (f.housing !== "rent") optionsScore += 10;
-    if (income <= 4000) optionsScore += 20;
-    add(items, "PA OPTIONS Program", "Pennsylvania", "Care at home", "Supports for eligible older adults who need help with daily living and want to remain at home.", "Care needs, income information, ID, contact information.", "https://www.pa.gov/services/aging/apply-for-options-program", optionsScore);
-
-    let chcScore = 0;
-    if (f.medicaid === "yes" && (f.medicareA === "yes" || f.medicareB === "yes")) chcScore += 50;
-    if (f.disability === "yes" && age >= 21) chcScore += 30;
-    if (f.longTermCare === "yes") chcScore += 20;
-    add(items, "PA Community HealthChoices (CHC)", "Pennsylvania", "Care at home / disability support", "Managed long-term services and supports for dual-eligible adults and adults with physical disabilities.", "Medicaid and Medicare information, care needs, medical records.", "https://www.pa.gov/agencies/dhs/resources/medicaid/chc/chc-providers", chcScore);
-
-    let olderDisabledMedicaid = 0;
-    if (f.disability === "yes" || age >= 65) olderDisabledMedicaid += 40;
-    if (income <= 2200) olderDisabledMedicaid += 35;
-    if (assets <= 10000) olderDisabledMedicaid += 25;
-    add(items, "PA Medicaid for Older Adults and People with Disabilities", "Pennsylvania", "Medical / disability support", "Pennsylvania Medicaid category for older adults and people with disabilities.", "Income proof, bank balances, ID, medical or disability information.", "https://www.pa.gov/agencies/dhs/resources/aging-physical-disabilities/medicaid-older-people-and-people-with-disabilities", olderDisabledMedicaid);
-
-    let share = 0;
-    if (age >= 60) share += 35;
-    if (f.housing === "rent" || f.housing === "own") share += 20;
-    if (income <= 3500) share += 20;
-    if (f.county) share += 25;
-    add(items, "PA SHARE Program", "Pennsylvania", "Housing", "Shared housing and resource exchange option for eligible older adults in participating counties.", "County, housing situation, contact information, basic income details.", "https://www.pa.gov/services/aging/apply-to-the-shared-housing-and-resource-exchange--share--progra", share);
-
-    let domCare = 0;
-    if (age >= 18) domCare += 15;
-    if (f.longTermCare === "yes") domCare += 40;
-    if (f.housing === "live_with_family" || f.housing === "rent") domCare += 15;
-    if (income <= 3500) domCare += 15;
-    if (f.disability === "yes" || age >= 60) domCare += 15;
-    add(items, "PA Domiciliary Care", "Pennsylvania", "Housing / supportive living", "Family-like home setting for adults who need supervision and support and cannot live alone.", "Functional needs, contact information, income details, care assessment.", "https://www.pa.gov/agencies/aging/aging-programs-and-services/housing-programs-for-older-adults", domCare);
-
-    if (f.disability === "yes") {
-      add(items, "PA OBRA Waiver", "Pennsylvania Disability", "Medical / disability support", "Home and community services for adults with developmental physical disabilities.", "Medical records, care needs, financial details, waiver intake forms.", "https://www.pa.gov/agencies/dhs/resources/medicaid/medicaid-waivers.html", 88);
-      add(items, "PA COMMCARE Waiver", "Pennsylvania Disability", "Medical / disability support", "Services for adults with traumatic brain injury and related care needs.", "Medical records, physician information, functional needs, Medicaid details.", "https://www.pa.gov/agencies/dhs/resources/medicaid/medicaid-waivers.html", 84);
-      add(items, "PA Attendant Care / Independence Waivers", "Pennsylvania Disability", "Medical / disability support", "In-home support programs for eligible adults with disabilities.", "Medical records, level-of-care details, Medicaid information, functional assessment.", "https://www.pa.gov/agencies/dhs/resources/medicaid/medicaid-waivers.html", 86);
-    }
   }
 
   return items.map(item => {
@@ -290,6 +321,28 @@ function buildResults(f) {
       : scoreLabel(item.score, fill);
     return { ...item, label };
   }).sort((a, b) => b.score - a.score || a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+}
+
+function HelpText({ field }) {
+  return WHY[field] ? <small className="helpText">{WHY[field]}</small> : null;
+}
+
+function ConfidenceMeter({ value }) {
+  const pct = Math.max(0, Math.min(100, value));
+  let label = "Low";
+  if (pct >= 80) label = "High";
+  else if (pct >= 55) label = "Medium";
+  return (
+    <div className="confidenceWrap">
+      <div className="confidenceTop">
+        <strong>Confidence meter</strong>
+        <span>{pct}% · {label}</span>
+      </div>
+      <div className="meter">
+        <div className="meterFill" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -328,7 +381,6 @@ export default function App() {
     const next = [...profiles.filter(p => p.personName !== name), { ...form, personName: name }];
     setProfiles(next);
     localStorage.setItem("benefits-profiles", JSON.stringify(next));
-    speakText(`Saved profile for ${name}`);
   }
 
   function loadProfile(p) {
@@ -346,6 +398,14 @@ export default function App() {
   const monthlyIncome = useMemo(() => totalIncome(form), [form]);
   const assets = useMemo(() => totalAssets(form), [form]);
   const fill = Math.round(completeness(form) * 100);
+  const previewResults = useMemo(() => (results.length ? results : buildResults(form)), [results, form]);
+  const flags = useMemo(() => autoFlags(form, previewResults), [form, previewResults]);
+  const prompts = useMemo(() => missingInfoPrompts(form), [form]);
+
+  const showMedicareQuestions = Number(form.age || 0) >= 65 || form.disability === "yes" || form.medicareA === "yes" || form.medicareB === "yes";
+  const showCareQuestions = form.disability === "yes" || Number(form.age || 0) >= 60 || form.longTermCare === "yes";
+  const showVehicleQuestions = form.state === "PA";
+  const showPropertyQuestions = form.state === "PA" && form.housing === "own";
 
   return (
     <div className="shell">
@@ -353,7 +413,7 @@ export default function App() {
         <div className="hero">
           <div>
             <h1>Benefits Finder Pro</h1>
-            <p>Senior, caregiver, and disability screening with stronger Pennsylvania coverage and result categories.</p>
+            <p>Now includes missing-info prompts that tell the user exactly what to answer next to improve accuracy.</p>
           </div>
         </div>
 
@@ -363,9 +423,19 @@ export default function App() {
           <button className={page===3?"active":""} onClick={() => setPage(3)}>Results</button>
         </div>
 
+        {(page === 1 || page === 2) && prompts.length > 0 && (
+          <div className="card">
+            <h2>Missing information that would improve results</h2>
+            <div className="promptList">
+              {prompts.map((p, i) => <div key={i} className="promptItem">• {p}</div>)}
+            </div>
+          </div>
+        )}
+
         {page === 1 && (
           <div className="card">
             <h2>Basic Information</h2>
+            <ConfidenceMeter value={fill} />
 
             <label>Name</label>
             <input value={form.personName} onChange={e => updateField("personName", e.target.value)} placeholder="Example: Mary Smith" />
@@ -402,27 +472,12 @@ export default function App() {
 
             <div className="row">
               <div>
-                <label>Retired</label>
-                <select value={form.retired} onChange={e => updateField("retired", e.target.value)}>
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
-                </select>
-              </div>
-              <div>
-                <label>Owns a vehicle</label>
-                <select value={form.ownsVehicle} onChange={e => updateField("ownsVehicle", e.target.value)}>
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="row">
-              <div>
-                <label>Veteran</label>
-                <select value={form.veteran} onChange={e => updateField("veteran", e.target.value)}>
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
+                <label>Citizenship / status</label>
+                <HelpText field="citizenStatus" />
+                <select value={form.citizenStatus} onChange={e => updateField("citizenStatus", e.target.value)}>
+                  <option value="citizen">U.S. citizen</option>
+                  <option value="qualified">Qualified non-citizen</option>
+                  <option value="other">Other / not sure</option>
                 </select>
               </div>
               <div>
@@ -432,6 +487,27 @@ export default function App() {
                 </select>
               </div>
             </div>
+
+            {showVehicleQuestions && (
+              <div className="row">
+                <div>
+                  <label>Retired</label>
+                  <HelpText field="retired" />
+                  <select value={form.retired} onChange={e => updateField("retired", e.target.value)}>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Owns a vehicle</label>
+                  <HelpText field="ownsVehicle" />
+                  <select value={form.ownsVehicle} onChange={e => updateField("ownsVehicle", e.target.value)}>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+              </div>
+            )}
 
             <div className="row">
               <div>
@@ -454,6 +530,7 @@ export default function App() {
         {page === 2 && (
           <div className="card">
             <h2>Eligibility Details</h2>
+            <ConfidenceMeter value={fill} />
 
             <div className="row">
               <div>
@@ -475,6 +552,36 @@ export default function App() {
               <div><label>Utilities separate</label><select value={form.utilitiesSeparate} onChange={e => updateField("utilitiesSeparate", e.target.value)}><option value="yes">Yes</option><option value="no">No</option></select></div>
             </div>
 
+            {showCareQuestions && (
+              <>
+                <div className="row">
+                  <div>
+                    <label>Needs help with daily living</label>
+                    <HelpText field="needsHelpDailyLiving" />
+                    <select value={form.needsHelpDailyLiving} onChange={e => updateField("needsHelpDailyLiving", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select>
+                  </div>
+                  <div>
+                    <label>Needs supervision</label>
+                    <HelpText field="needsSupervision" />
+                    <select value={form.needsSupervision} onChange={e => updateField("needsSupervision", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select>
+                  </div>
+                </div>
+
+                <div className="row">
+                  <div>
+                    <label>Cannot live alone</label>
+                    <HelpText field="cannotLiveAlone" />
+                    <select value={form.cannotLiveAlone} onChange={e => updateField("cannotLiveAlone", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select>
+                  </div>
+                  <div>
+                    <label>Nursing facility level of care</label>
+                    <HelpText field="nursingFacilityLevelCare" />
+                    <select value={form.nursingFacilityLevelCare} onChange={e => updateField("nursingFacilityLevelCare", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select>
+                  </div>
+                </div>
+              </>
+            )}
+
             <label>Monthly income by source</label>
             <div className="grid3">
               <input type="number" value={form.monthlySocialSecurity} onChange={e => updateField("monthlySocialSecurity", e.target.value)} placeholder="Social Security" />
@@ -487,30 +594,62 @@ export default function App() {
 
             <label>Assets</label>
             <div className="grid3">
-              <input type="number" value={form.checkingBalance} onChange={e => updateField("checkingBalance", e.target.value)} placeholder="Checking" />
-              <input type="number" value={form.savingsBalance} onChange={e => updateField("savingsBalance", e.target.value)} placeholder="Savings" />
-              <input type="number" value={form.otherAssets} onChange={e => updateField("otherAssets", e.target.value)} placeholder="Other assets" />
+              <div>
+                <HelpText field="checkingBalance" />
+                <input type="number" value={form.checkingBalance} onChange={e => updateField("checkingBalance", e.target.value)} placeholder="Checking" />
+              </div>
+              <div>
+                <HelpText field="savingsBalance" />
+                <input type="number" value={form.savingsBalance} onChange={e => updateField("savingsBalance", e.target.value)} placeholder="Savings" />
+              </div>
+              <div>
+                <input type="number" value={form.otherAssets} onChange={e => updateField("otherAssets", e.target.value)} placeholder="Other assets" />
+              </div>
             </div>
 
             <div className="row">
               <div><label>Monthly rent / mortgage</label><input type="number" value={form.monthlyRentMortgage} onChange={e => updateField("monthlyRentMortgage", e.target.value)} /></div>
-              <div><label>Property taxes paid yearly</label><input type="number" value={form.propertyTaxesPaid} onChange={e => updateField("propertyTaxesPaid", e.target.value)} /></div>
+              {showPropertyQuestions && <div><label>Property taxes paid yearly</label><input type="number" value={form.propertyTaxesPaid} onChange={e => updateField("propertyTaxesPaid", e.target.value)} /></div>}
             </div>
 
-            <div className="row">
-              <div><label>Medicare A</label><select value={form.medicareA} onChange={e => updateField("medicareA", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select></div>
-              <div><label>Medicare B</label><select value={form.medicareB} onChange={e => updateField("medicareB", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select></div>
-            </div>
+            {showMedicareQuestions && (
+              <>
+                <div className="row">
+                  <div>
+                    <label>Medicare A</label>
+                    <HelpText field="medicareA" />
+                    <select value={form.medicareA} onChange={e => updateField("medicareA", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select>
+                  </div>
+                  <div>
+                    <label>Medicare B</label>
+                    <HelpText field="medicareB" />
+                    <select value={form.medicareB} onChange={e => updateField("medicareB", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select>
+                  </div>
+                </div>
 
-            <div className="row">
-              <div><label>Medicare D</label><select value={form.medicareD} onChange={e => updateField("medicareD", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select></div>
-              <div><label>Medicaid active</label><select value={form.medicaid} onChange={e => updateField("medicaid", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select></div>
-            </div>
+                <div className="row">
+                  <div>
+                    <label>Medicare D</label>
+                    <HelpText field="medicareD" />
+                    <select value={form.medicareD} onChange={e => updateField("medicareD", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select>
+                  </div>
+                  <div>
+                    <label>Medicaid active</label>
+                    <HelpText field="medicaid" />
+                    <select value={form.medicaid} onChange={e => updateField("medicaid", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select>
+                  </div>
+                </div>
 
-            <div className="row">
-              <div><label>Prescription costs per month</label><input type="number" value={form.prescriptionCosts} onChange={e => updateField("prescriptionCosts", e.target.value)} /></div>
-              <div><label>Long-term care / home care need</label><select value={form.longTermCare} onChange={e => updateField("longTermCare", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select></div>
-            </div>
+                <div className="row">
+                  <div>
+                    <label>Prescription costs per month</label>
+                    <HelpText field="prescriptionCosts" />
+                    <input type="number" value={form.prescriptionCosts} onChange={e => updateField("prescriptionCosts", e.target.value)} />
+                  </div>
+                  <div><label>Long-term care / home care need</label><select value={form.longTermCare} onChange={e => updateField("longTermCare", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select></div>
+                </div>
+              </>
+            )}
 
             <div className="summary">
               <div><strong>Total monthly income:</strong> {currency(monthlyIncome)}</div>
@@ -529,12 +668,23 @@ export default function App() {
         {page === 3 && (
           <div className="card">
             <h2>Results</h2>
-            <div className="notice">Pennsylvania results now include tax relief, transportation savings, care-at-home options, housing support, and disability services.</div>
+            <ConfidenceMeter value={fill} />
+            {prompts.length > 0 && (
+              <div className="flags">
+                <strong>Missing information that would improve accuracy</strong>
+                {prompts.map((p, i) => <div key={i} className="flagItem">• {p}</div>)}
+              </div>
+            )}
+            {flags.length > 0 && (
+              <div className="flags">
+                <strong>Auto flags</strong>
+                {flags.map((flag, i) => <div key={i} className="flagItem">• {flag}</div>)}
+              </div>
+            )}
 
             <div className="actions">
               <button className="secondary" onClick={() => setPage(1)}>Edit info</button>
               <button className="secondary" onClick={() => window.print()}>Print</button>
-              <button className="secondary" onClick={() => speakText(`There are ${results.length} results.`)}>Read aloud</button>
             </div>
 
             {results.length === 0 ? <div className="empty">Enter information and tap Find benefits.</div> : results.map((item, i) => (
