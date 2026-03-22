@@ -43,6 +43,27 @@ const CONDITIONS = [
   "Traumatic brain injury","Other chronic disease"
 ];
 
+const MONTH_OPTIONS = [
+  { value: "", label: "Month" },
+  { value: "01", label: "Jan" }, { value: "02", label: "Feb" }, { value: "03", label: "Mar" },
+  { value: "04", label: "Apr" }, { value: "05", label: "May" }, { value: "06", label: "Jun" },
+  { value: "07", label: "Jul" }, { value: "08", label: "Aug" }, { value: "09", label: "Sep" },
+  { value: "10", label: "Oct" }, { value: "11", label: "Nov" }, { value: "12", label: "Dec" }
+];
+const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
+const YEAR_OPTIONS = Array.from({ length: 110 }, (_, i) => String(new Date().getFullYear() - i));
+
+function splitDobParts(dob) {
+  if (!dob || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) return { year: "", month: "", day: "" };
+  const [year, month, day] = dob.split("-");
+  return { year, month, day };
+}
+
+function buildDob(year, month, day) {
+  if (!year || !month || !day) return "";
+  return `${year}-${month}-${day}`;
+}
+
 const WHY = {
   citizenStatus: "Why this matters: Many programs require U.S. citizenship or qualified status.",
   needsHelpDailyLiving: "Why this matters: Helps find programs that pay for in-home care or assistance.",
@@ -448,6 +469,7 @@ export default function App() {
   const monthlyIncome = useMemo(() => totalIncome(form), [form]);
   const assets = useMemo(() => totalAssets(form), [form]);
   const fill = Math.round(completeness(form) * 100);
+  const dobParts = useMemo(() => splitDobParts(form.dob), [form.dob]);
   const previewResults = useMemo(() => (results.length ? results : buildResults(form)), [results, form]);
   const flags = useMemo(() => autoFlags(form, previewResults), [form, previewResults]);
   const prompts = useMemo(() => missingInfoPrompts(form), [form]);
@@ -487,8 +509,36 @@ export default function App() {
             <label>Name</label>
             <input value={form.personName} onChange={e => updateField("personName", e.target.value)} placeholder="Example: Mary Smith" />
             <div className="row">
-              <div><label>Date of birth</label><input type="date" value={form.dob} onChange={e => updateField("dob", e.target.value)} /></div>
-              <div><label>Age</label><input type="number" value={form.age} onChange={e => updateField("age", e.target.value)} placeholder="65" /></div>
+              <div>
+                <label>Date of birth</label>
+                <div className="dobRow">
+                  <select
+                    value={dobParts.month}
+                    onChange={e => updateField("dob", buildDob(dobParts.year, e.target.value, dobParts.day))}
+                  >
+                    {MONTH_OPTIONS.map(opt => <option key={opt.label} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                  <select
+                    value={dobParts.day}
+                    onChange={e => updateField("dob", buildDob(dobParts.year, dobParts.month, e.target.value))}
+                  >
+                    <option value="">Day</option>
+                    {DAY_OPTIONS.map(day => <option key={day} value={day}>{day}</option>)}
+                  </select>
+                  <select
+                    value={dobParts.year}
+                    onChange={e => updateField("dob", buildDob(e.target.value, dobParts.month, dobParts.day))}
+                  >
+                    <option value="">Year</option>
+                    {YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}
+                  </select>
+                </div>
+                <small className="helpText">Better for phones: choose month, day, and year without long scrolling.</small>
+              </div>
+              <div>
+                <label>Age</label>
+                <input type="number" value={form.age} onChange={e => updateField("age", e.target.value)} placeholder="65" />
+              </div>
             </div>
             <div className="row">
               <div><label>Marital status</label><select value={form.maritalStatus} onChange={e => updateField("maritalStatus", e.target.value)}><option value="single">Single</option><option value="married">Married</option><option value="widowed">Widowed</option><option value="divorced">Divorced</option></select></div>
@@ -509,7 +559,7 @@ export default function App() {
               </div>
             )}
             <div className="row"><div><label>School district</label><input value={form.schoolDistrict} onChange={e => updateField("schoolDistrict", e.target.value)} placeholder="Optional" /></div><div></div></div>
-            <div className="actions"><button onClick={() => setPage(2)}>Next</button><button className="secondary" onClick={saveProfile}>Save profile</button></div>
+            <div className="actions stickyActions"><button className="primaryAction" onClick={() => setPage(2)}>Next</button><button className="secondary" onClick={saveProfile}>Save profile</button></div>
           </div>
         )}
 
@@ -577,7 +627,7 @@ export default function App() {
               <div><strong>Total assets:</strong> {currency(assets)}</div>
               <div><strong>Info entered:</strong> {fill}%</div>
             </div>
-            <div className="actions"><button className="secondary" onClick={() => setPage(1)}>Back</button><button onClick={calculate}>Find benefits</button><button className="secondary" onClick={saveProfile}>Save profile</button></div>
+            <div className="actions stickyActions"><button className="secondary" onClick={() => setPage(1)}>Back</button><button className="primaryAction" onClick={calculate}>Find benefits</button><button className="secondary" onClick={saveProfile}>Save profile</button></div>
           </div>
         )}
 

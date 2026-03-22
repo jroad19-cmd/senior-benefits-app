@@ -49,3 +49,52 @@ a { color:#1455af; font-weight:700; }
   .grid3 { grid-template-columns: 1fr; }
   .hero h1 { font-size:28px; }
 }
+
+
+.dobRow { display:grid; grid-template-columns: 1.2fr 1fr 1.2fr; gap:8px; }
+@media (max-width: 900px) {
+  .dobRow { grid-template-columns: 1fr 1fr 1fr; }
+}
+
+
+/* Mobile-friendly form controls */
+input, select, button {
+  font-size: 18px;
+}
+
+select {
+  min-height: 58px;
+}
+
+.dobRow select {
+  min-height: 60px;
+  font-size: 18px;
+}
+
+.primaryAction {
+  font-size: 20px;
+  min-height: 56px;
+}
+
+.stickyActions {
+  position: sticky;
+  bottom: 10px;
+  background: rgba(255,255,255,0.96);
+  padding: 10px;
+  border: 1px solid #dbe8f3;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(18,56,94,.10);
+  z-index: 20;
+}
+
+@media (max-width: 900px) {
+  .stickyActions {
+    bottom: 8px;
+  }
+  label {
+    font-size: 19px;
+  }
+  input, select {
+    min-height: 60px;
+  }
+}
