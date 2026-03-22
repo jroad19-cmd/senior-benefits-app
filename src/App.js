@@ -71,7 +71,9 @@ const emptyForm = {
   medicareD: "no",
   medicaid: "no",
   prescriptionCosts: "",
-  longTermCare: "no"
+  longTermCare: "no",
+  retired: "no",
+  ownsVehicle: "no"
 };
 
 function currency(n) {
@@ -97,21 +99,6 @@ function speakText(text) {
   window.speechSynthesis.speak(u);
 }
 
-function useSpeechInput() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const supported = !!SpeechRecognition;
-  const listen = (onText) => {
-    if (!SpeechRecognition) return;
-    const rec = new SpeechRecognition();
-    rec.lang = "en-US";
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    rec.onresult = (e) => onText((e.results?.[0]?.[0]?.transcript || "").replace(/[^0-9.]/g, ""));
-    rec.start();
-  };
-  return { supported, listen };
-}
-
 function totalIncome(f) {
   return ["monthlySocialSecurity","monthlySSI","monthlySSDI","monthlyPension","monthlyWages","monthlyInterest","monthlyOtherIncome"]
     .reduce((sum, key) => sum + Number(f[key] || 0), 0);
@@ -135,8 +122,8 @@ function scoreLabel(score, fill) {
   return "Needs more information";
 }
 
-function add(items, name, type, description, docs, link, score) {
-  items.push({ name, type, description, docs, link, score });
+function add(items, name, type, category, description, docs, link, score) {
+  items.push({ name, type, category, description, docs, link, score });
 }
 
 function buildResults(f) {
@@ -152,14 +139,14 @@ function buildResults(f) {
   if (income <= 1971) ssiScore += 40;
   if ((f.maritalStatus === "married" && assets <= 3000) || (f.maritalStatus !== "married" && assets <= 2000)) ssiScore += 20;
   ssiScore += 5;
-  add(items, "SSI", "Federal", "Monthly cash assistance for older adults and people with disabilities who meet income and resource rules.", "Photo ID, Social Security number, income proof, bank balances, housing costs.", "https://www.ssa.gov/ssi", ssiScore);
+  add(items, "SSI", "Federal", "Cash / income", "Monthly cash assistance for older adults and people with disabilities who meet income and resource rules.", "Photo ID, Social Security number, income proof, bank balances, housing costs.", "https://www.ssa.gov/ssi", ssiScore);
 
   let ssdiScore = 0;
   if (f.disability === "yes") ssdiScore += 45;
   if (Number(f.monthlySSDI || 0) > 0) ssdiScore += 40;
   if (age < 65) ssdiScore += 10;
   if (Number(f.monthlyWages || 0) < 1700) ssdiScore += 5;
-  if (ssdiScore > 0) add(items, "SSDI", "Federal", "Disability income for people with qualifying work history and disability status.", "Work history, medical records, diagnosis details, provider information, income information.", "https://www.ssa.gov/benefits/disability/", ssdiScore);
+  if (ssdiScore > 0) add(items, "SSDI", "Federal", "Cash / income", "Disability income for people with qualifying work history and disability status.", "Work history, medical records, diagnosis details, provider information, income information.", "https://www.ssa.gov/benefits/disability/", ssdiScore);
 
   let snapScore = 0;
   const snapLimit = 2550 + (household - 1) * 900;
@@ -167,14 +154,14 @@ function buildResults(f) {
   if (f.housing === "rent" || Number(f.monthlyRentMortgage || 0) > 0) snapScore += 15;
   if (f.utilitiesSeparate === "yes") snapScore += 10;
   snapScore += 5;
-  add(items, "SNAP", "Federal", "Monthly grocery help based on income and household size.", "ID, income proof, rent or mortgage, utility bills, household members.", "https://www.fns.usda.gov/snap", snapScore);
+  add(items, "SNAP", "Federal", "Food", "Monthly grocery help based on income and household size.", "ID, income proof, rent or mortgage, utility bills, household members.", "https://www.fns.usda.gov/snap", snapScore);
 
   let liheapScore = 0;
   if (income <= 3000) liheapScore += 60;
   if (Number(f.monthlyRentMortgage || 0) > 0 || Number(f.propertyTaxesPaid || 0) > 0) liheapScore += 15;
   if (f.utilitiesSeparate === "yes") liheapScore += 20;
   liheapScore += 5;
-  add(items, "LIHEAP", "Federal / State", "Help with heating and cooling bills.", "Utility bill, ID, income proof, household list.", "https://www.acf.hhs.gov/ocs/low-income-home-energy-assistance-program-liheap", liheapScore);
+  add(items, "LIHEAP", "Federal / State", "Utilities", "Help with heating and cooling bills.", "Utility bill, ID, income proof, household list.", "https://www.acf.hhs.gov/ocs/low-income-home-energy-assistance-program-liheap", liheapScore);
 
   if (f.housing === "rent") {
     let sec8 = 0;
@@ -182,7 +169,7 @@ function buildResults(f) {
     if (Number(f.monthlyRentMortgage || 0) > 0) sec8 += 15;
     if (f.disability === "yes" || age >= 62) sec8 += 10;
     sec8 += 35;
-    add(items, "Housing Choice Voucher / Section 8", "Federal / Local", "Rent assistance through local housing authorities.", "ID, income proof, rent amount, lease, household information.", "https://www.hud.gov/topics/housing_choice_voucher_program_section_8", sec8);
+    add(items, "Housing Choice Voucher / Section 8", "Federal / Local", "Housing", "Rent assistance through local housing authorities.", "ID, income proof, rent amount, lease, household information.", "https://www.hud.gov/topics/housing_choice_voucher_program_section_8", sec8);
   }
 
   if (age >= 65 || f.disability === "yes" || f.medicareA === "yes" || f.medicareB === "yes") {
@@ -191,14 +178,14 @@ function buildResults(f) {
     if (income <= 2200) msp += 40;
     if (assets <= 10000) msp += 20;
     if (age >= 65 || f.disability === "yes") msp += 10;
-    add(items, "Medicare Savings Programs", "Federal / State", "Help paying Medicare premiums and sometimes deductibles or copays.", "Medicare card, ID, income proof, bank balances.", "https://www.medicare.gov/basics/costs/help/medicare-savings-programs", msp);
+    add(items, "Medicare Savings Programs", "Federal / State", "Medical / prescription savings", "Help paying Medicare premiums and sometimes deductibles or copays.", "Medicare card, ID, income proof, bank balances.", "https://www.medicare.gov/basics/costs/help/medicare-savings-programs", msp);
 
     let extraHelp = 0;
     if (f.medicareD === "yes" || f.medicareA === "yes" || f.medicareB === "yes") extraHelp += 25;
     if (income <= 2500) extraHelp += 40;
     if (assets <= 18000) extraHelp += 20;
     if (Number(f.prescriptionCosts || 0) > 0) extraHelp += 15;
-    add(items, "Extra Help for Prescriptions", "Federal", "Help paying Medicare Part D prescription costs.", "Medicare information, prescription list, income and resource details.", "https://www.ssa.gov/extrahelp", extraHelp);
+    add(items, "Extra Help for Prescriptions", "Federal", "Medical / prescription savings", "Help paying Medicare Part D prescription costs.", "Medicare information, prescription list, income and resource details.", "https://www.ssa.gov/extrahelp", extraHelp);
   }
 
   if (f.disability === "yes") {
@@ -207,23 +194,23 @@ function buildResults(f) {
     if (income <= 2200) medicaidDis += 30;
     if (assets <= 10000) medicaidDis += 20;
     if (f.longTermCare === "yes") medicaidDis += 10;
-    add(items, "Medicaid (Disability Path)", "Federal / State", "Medical coverage pathway commonly used by younger people with disabilities and adults with care needs.", "ID, medical records, income proof, bank balances, disability information.", STATES[f.state]?.portal || "https://www.medicaid.gov/", medicaidDis);
+    add(items, "Medicaid (Disability Path)", "Federal / State", "Medical / disability support", "Medical coverage pathway commonly used by younger people with disabilities and adults with care needs.", "ID, medical records, income proof, bank balances, disability information.", STATES[f.state]?.portal || "https://www.medicaid.gov/", medicaidDis);
 
     let hcbs = 0;
     hcbs += 40;
     if (f.longTermCare === "yes") hcbs += 25;
     if (f.medicaid === "yes") hcbs += 20;
     if (Number(f.prescriptionCosts || 0) > 0) hcbs += 15;
-    add(items, "HCBS Waivers / Home Care Support", "State", "Home and community-based services that may help with care at home instead of institutional care.", "Medical records, care needs, Medicaid details, physician information.", STATES[f.state]?.portal || "https://www.medicaid.gov/medicaid/home-community-based-services/home-community-based-services-authorities/index.html", hcbs);
+    add(items, "HCBS Waivers / Home Care Support", "State", "Medical / disability support", "Home and community-based services that may help with care at home instead of institutional care.", "Medical records, care needs, Medicaid details, physician information.", STATES[f.state]?.portal || "https://www.medicaid.gov/medicaid/home-community-based-services/home-community-based-services-authorities/index.html", hcbs);
 
-    add(items, "ABLE Account", "Federal / State", "Tax-advantaged savings account for eligible people with disabilities.", "Disability onset information, identification, banking information.", "https://www.ablenrc.org/", 85);
-    add(items, "Ticket to Work", "Federal", "Employment support for people receiving disability benefits.", "SSDI or SSI benefit information, work goals.", "https://choosework.ssa.gov/", 75);
+    add(items, "ABLE Account", "Federal / State", "Financial planning", "Tax-advantaged savings account for eligible people with disabilities.", "Disability onset information, identification, banking information.", "https://www.ablenrc.org/", 85);
+    add(items, "Ticket to Work", "Federal", "Work support", "Employment support for people receiving disability benefits.", "SSDI or SSI benefit information, work goals.", "https://choosework.ssa.gov/", 75);
   }
 
   const statePortal = STATES[f.state]?.portal || "https://www.benefits.gov/benefit-finder";
   const stateUnclaimed = STATES[f.state]?.unclaimed || "https://www.missingmoney.com/";
-  add(items, `${f.state} State Benefits Portal`, "State", "Official state portal for food, medical, cash, utility, and other support programs.", "ID, address, income proof, household size.", statePortal, 100);
-  add(items, `${f.state} Unclaimed Money`, "State", "Search for unclaimed money, dormant accounts, old refunds, or property owed to you.", "Your name and current or past address.", stateUnclaimed, 100);
+  add(items, `${f.state} State Benefits Portal`, "State", "General state help", "Official state portal for food, medical, cash, utility, and other support programs.", "ID, address, income proof, household size.", statePortal, 100);
+  add(items, `${f.state} Unclaimed Money`, "State", "Unclaimed money", "Search for unclaimed money, dormant accounts, old refunds, or property owed to you.", "Your name and current or past address.", stateUnclaimed, 100);
 
   if (f.state === "PA") {
     let ptrr = 0;
@@ -231,35 +218,78 @@ function buildResults(f) {
     if (f.primaryResidence === "yes") ptrr += 15;
     if (income * 12 <= 35000) ptrr += 35;
     if (f.housing === "rent" || Number(f.propertyTaxesPaid || 0) > 0) ptrr += 15;
-    add(items, "PA Property Tax / Rent Rebate", "Pennsylvania", "Annual rebate for eligible older adults and some people with disabilities.", "Rent certificate or property tax proof, income documents, ID.", "https://www.revenue.pa.gov/IncentivesCreditsPrograms/PropertyTaxRentRebateProgram/Pages/default.aspx", ptrr);
+    add(items, "PA Property Tax / Rent Rebate", "Pennsylvania", "Cash / tax relief", "Annual rebate for eligible older adults and some people with disabilities.", "Rent certificate or property tax proof, income documents, ID.", "https://www.revenue.pa.gov/IncentivesCreditsPrograms/PropertyTaxRentRebateProgram/Pages/default.aspx", ptrr);
 
     let homestead = 0;
     if (f.primaryResidence === "yes") homestead += 40;
     if (f.housing === "own") homestead += 25;
     if (f.schoolDistrict) homestead += 15;
     if (Number(f.propertyTaxesPaid || 0) > 0) homestead += 20;
-    add(items, "PA Homestead / Farmstead Exclusion", "Pennsylvania", "Property tax relief that may reduce the assessed value used to calculate school property taxes on an eligible primary residence. This is different from the cash rebate program.", "Proof the home is your primary residence, parcel or property information, homeowner information, county assessment application.", "https://dced.pa.gov/local-government/property-tax-relief-homestead-exclusion/", homestead);
+    add(items, "PA Homestead / Farmstead Exclusion", "Pennsylvania", "Cash / tax relief", "Property tax relief that may reduce the assessed value used to calculate school property taxes on an eligible primary residence. This is different from the cash rebate program.", "Proof the home is your primary residence, parcel or property information, homeowner information, county assessment application.", "https://dced.pa.gov/local-government/property-tax-relief-homestead-exclusion/", homestead);
 
     let pace = 0;
     if (age >= 65) pace += 25;
     if (income * 12 <= 33000) pace += 35;
     if (f.medicareD === "yes" || Number(f.prescriptionCosts || 0) > 0) pace += 20;
     pace += 20;
-    add(items, "PACE / PACENET", "Pennsylvania", "Prescription help for eligible Pennsylvania seniors.", "Prescription list, Medicare card, income proof, ID.", "https://www.aging.pa.gov/aging-services/prescription-assistance/Pages/default.aspx", pace);
+    add(items, "PACE / PACENET", "Pennsylvania", "Medical / prescription savings", "Prescription help for eligible Pennsylvania seniors.", "Prescription list, Medicare card, income proof, ID.", "https://www.aging.pa.gov/aging-services/prescription-assistance/Pages/default.aspx", pace);
+
+    let vehicle = 0;
+    if (f.retired === "yes") vehicle += 35;
+    if (f.ownsVehicle === "yes") vehicle += 35;
+    if (income * 12 <= 29000) vehicle += 20;
+    if (age >= 65) vehicle += 10;
+    add(items, "PA Retired Person Vehicle Registration", "Pennsylvania", "Transportation savings", "Reduced retired-status vehicle registration fee for eligible retired Pennsylvanians.", "Vehicle registration, proof of retirement or retired status, income information, PennDOT form.", "https://www.pa.gov/services/dmv/apply-for-retired-status-vehicle-registration", vehicle);
+
+    add(items, "PA MEDI", "Pennsylvania", "Medical / prescription savings", "Free Medicare counseling that can help compare plans, avoid penalties, and reduce out-of-pocket costs.", "Medicare card, current plan information, medication list.", "https://www.pa.gov/agencies/aging/aging-programs-and-services/pa-medi-medicare-counseling", 100);
+
+    let optionsScore = 0;
+    if (age >= 60) optionsScore += 35;
+    if (f.longTermCare === "yes") optionsScore += 35;
+    if (f.housing !== "rent") optionsScore += 10;
+    if (income <= 4000) optionsScore += 20;
+    add(items, "PA OPTIONS Program", "Pennsylvania", "Care at home", "Supports for eligible older adults who need help with daily living and want to remain at home.", "Care needs, income information, ID, contact information.", "https://www.pa.gov/services/aging/apply-for-options-program", optionsScore);
+
+    let chcScore = 0;
+    if (f.medicaid === "yes" && (f.medicareA === "yes" || f.medicareB === "yes")) chcScore += 50;
+    if (f.disability === "yes" && age >= 21) chcScore += 30;
+    if (f.longTermCare === "yes") chcScore += 20;
+    add(items, "PA Community HealthChoices (CHC)", "Pennsylvania", "Care at home / disability support", "Managed long-term services and supports for dual-eligible adults and adults with physical disabilities.", "Medicaid and Medicare information, care needs, medical records.", "https://www.pa.gov/agencies/dhs/resources/medicaid/chc/chc-providers", chcScore);
+
+    let olderDisabledMedicaid = 0;
+    if (f.disability === "yes" || age >= 65) olderDisabledMedicaid += 40;
+    if (income <= 2200) olderDisabledMedicaid += 35;
+    if (assets <= 10000) olderDisabledMedicaid += 25;
+    add(items, "PA Medicaid for Older Adults and People with Disabilities", "Pennsylvania", "Medical / disability support", "Pennsylvania Medicaid category for older adults and people with disabilities.", "Income proof, bank balances, ID, medical or disability information.", "https://www.pa.gov/agencies/dhs/resources/aging-physical-disabilities/medicaid-older-people-and-people-with-disabilities", olderDisabledMedicaid);
+
+    let share = 0;
+    if (age >= 60) share += 35;
+    if (f.housing === "rent" || f.housing === "own") share += 20;
+    if (income <= 3500) share += 20;
+    if (f.county) share += 25;
+    add(items, "PA SHARE Program", "Pennsylvania", "Housing", "Shared housing and resource exchange option for eligible older adults in participating counties.", "County, housing situation, contact information, basic income details.", "https://www.pa.gov/services/aging/apply-to-the-shared-housing-and-resource-exchange--share--progra", share);
+
+    let domCare = 0;
+    if (age >= 18) domCare += 15;
+    if (f.longTermCare === "yes") domCare += 40;
+    if (f.housing === "live_with_family" || f.housing === "rent") domCare += 15;
+    if (income <= 3500) domCare += 15;
+    if (f.disability === "yes" || age >= 60) domCare += 15;
+    add(items, "PA Domiciliary Care", "Pennsylvania", "Housing / supportive living", "Family-like home setting for adults who need supervision and support and cannot live alone.", "Functional needs, contact information, income details, care assessment.", "https://www.pa.gov/agencies/aging/aging-programs-and-services/housing-programs-for-older-adults", domCare);
 
     if (f.disability === "yes") {
-      add(items, "PA OBRA Waiver", "Pennsylvania Disability", "Home and community services for adults with developmental physical disabilities.", "Medical records, care needs, financial details, waiver intake forms.", "https://www.pa.gov/agencies/dhs/resources/medicaid/medicaid-waivers.html", 88);
-      add(items, "PA COMMCARE Waiver", "Pennsylvania Disability", "Services for adults with traumatic brain injury and related care needs.", "Medical records, physician information, functional needs, Medicaid details.", "https://www.pa.gov/agencies/dhs/resources/medicaid/medicaid-waivers.html", 84);
-      add(items, "PA Attendant Care / Independence Waivers", "Pennsylvania Disability", "In-home support programs for eligible adults with disabilities.", "Medical records, level-of-care details, Medicaid information, functional assessment.", "https://www.pa.gov/agencies/dhs/resources/medicaid/medicaid-waivers.html", 86);
+      add(items, "PA OBRA Waiver", "Pennsylvania Disability", "Medical / disability support", "Home and community services for adults with developmental physical disabilities.", "Medical records, care needs, financial details, waiver intake forms.", "https://www.pa.gov/agencies/dhs/resources/medicaid/medicaid-waivers.html", 88);
+      add(items, "PA COMMCARE Waiver", "Pennsylvania Disability", "Medical / disability support", "Services for adults with traumatic brain injury and related care needs.", "Medical records, physician information, functional needs, Medicaid details.", "https://www.pa.gov/agencies/dhs/resources/medicaid/medicaid-waivers.html", 84);
+      add(items, "PA Attendant Care / Independence Waivers", "Pennsylvania Disability", "Medical / disability support", "In-home support programs for eligible adults with disabilities.", "Medical records, level-of-care details, Medicaid information, functional assessment.", "https://www.pa.gov/agencies/dhs/resources/medicaid/medicaid-waivers.html", 86);
     }
   }
 
   return items.map(item => {
-    const label = item.score === 100 && (item.name.includes("Portal") || item.name.includes("Unclaimed"))
+    const label = item.score === 100 && (item.name.includes("Portal") || item.name.includes("Unclaimed") || item.name === "PA MEDI")
       ? "Definitely worth checking"
       : scoreLabel(item.score, fill);
     return { ...item, label };
-  }).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  }).sort((a, b) => b.score - a.score || a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
 }
 
 export default function App() {
@@ -267,8 +297,6 @@ export default function App() {
   const [results, setResults] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [page, setPage] = useState(1);
-  const [mode, setMode] = useState("single");
-  const speech = useSpeechInput();
 
   useEffect(() => {
     try {
@@ -325,11 +353,8 @@ export default function App() {
         <div className="hero">
           <div>
             <h1>Benefits Finder Pro</h1>
-            <p>Built for seniors, caregivers, and younger people with disabilities. More details create stronger eligibility labels.</p>
+            <p>Senior, caregiver, and disability screening with stronger Pennsylvania coverage and result categories.</p>
           </div>
-          <button className="secondary" onClick={() => setMode(mode === "single" ? "caregiver" : "single")}>
-            {mode === "single" ? "Caregiver Mode" : "Single Person Mode"}
-          </button>
         </div>
 
         <div className="tabs">
@@ -340,7 +365,7 @@ export default function App() {
 
         {page === 1 && (
           <div className="card">
-            <h2>{mode === "single" ? "Basic Information" : "Caregiver Intake"}</h2>
+            <h2>Basic Information</h2>
 
             <label>Name</label>
             <input value={form.personName} onChange={e => updateField("personName", e.target.value)} placeholder="Example: Mary Smith" />
@@ -352,10 +377,7 @@ export default function App() {
               </div>
               <div>
                 <label>Age</label>
-                <div className="inline">
-                  <input type="number" value={form.age} onChange={e => updateField("age", e.target.value)} placeholder="65" />
-                  {speech.supported && <button type="button" className="small" onClick={() => speech.listen(t => updateField("age", t))}>Speak</button>}
-                </div>
+                <input type="number" value={form.age} onChange={e => updateField("age", e.target.value)} placeholder="65" />
               </div>
             </div>
 
@@ -372,6 +394,23 @@ export default function App() {
               <div>
                 <label>Disability</label>
                 <select value={form.disability} onChange={e => updateField("disability", e.target.value)}>
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="row">
+              <div>
+                <label>Retired</label>
+                <select value={form.retired} onChange={e => updateField("retired", e.target.value)}>
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+              <div>
+                <label>Owns a vehicle</label>
+                <select value={form.ownsVehicle} onChange={e => updateField("ownsVehicle", e.target.value)}>
                   <option value="no">No</option>
                   <option value="yes">Yes</option>
                 </select>
@@ -490,7 +529,7 @@ export default function App() {
         {page === 3 && (
           <div className="card">
             <h2>Results</h2>
-            <div className="notice">“Definitely worth applying” and “Strong match” are based on the information entered here. Final approval still depends on the agency.</div>
+            <div className="notice">Pennsylvania results now include tax relief, transportation savings, care-at-home options, housing support, and disability services.</div>
 
             <div className="actions">
               <button className="secondary" onClick={() => setPage(1)}>Edit info</button>
@@ -504,7 +543,7 @@ export default function App() {
                   <h3>{item.name}</h3>
                   <span className={`badge ${item.label.toLowerCase().replace(/\s+/g, "-")}`}>{item.label}</span>
                 </div>
-                <div className="muted">{item.type}</div>
+                <div className="muted">{item.type} · {item.category}</div>
                 <p>{item.description}</p>
                 <p><strong>Match score:</strong> {item.score}/100</p>
                 <p><strong>What to gather:</strong> {item.docs}</p>
