@@ -37,12 +37,6 @@ const ALL_STATES = [
  "ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK",
  "OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"
 ];
-const CONDITIONS = [
-  "None selected","Cancer","Diabetes","Heart disease","COPD / lung disease","Kidney disease",
-  "Multiple sclerosis","Parkinson's disease","Rheumatoid arthritis","Rare disease",
-  "Traumatic brain injury","Other chronic disease"
-];
-
 const MONTH_OPTIONS = [
   { value: "", label: "Month" },
   { value: "01", label: "Jan" }, { value: "02", label: "Feb" }, { value: "03", label: "Mar" },
@@ -66,6 +60,7 @@ function buildDob(year, month, day) {
 
 const WHY = {
   citizenStatus: "Why this matters: Many programs require U.S. citizenship or qualified status.",
+  veteran: "Why this matters: Veteran status can unlock VA pension, healthcare, and other veteran-specific programs.",
   needsHelpDailyLiving: "Why this matters: Helps find programs that pay for in-home care or assistance.",
   needsSupervision: "Why this matters: Some programs require supervision needs to qualify for care services.",
   cannotLiveAlone: "Why this matters: This helps determine eligibility for housing or care programs like Domiciliary Care.",
@@ -74,23 +69,26 @@ const WHY = {
   medicareB: "Why this matters: Determines if you may qualify for programs that lower Medicare costs.",
   medicareD: "Why this matters: Helps find prescription savings programs.",
   medicaid: "Why this matters: Some programs only apply if you already have Medicaid.",
+  receivingSNAP: "Why this matters: Current SNAP enrollment is a strong indicator of food assistance eligibility.",
+  receivingSSI: "Why this matters: Current SSI enrollment indicates eligibility for low-income cash and medical supports.",
+  receivingSSDI: "Why this matters: Current SSDI enrollment indicates a disability benefit pathway.",
+  receivingOtherBenefits: "Why this matters: Include other benefits such as Medicaid, public housing, LIHEAP, veterans assistance, or utility discounts.",
   prescriptionCosts: "Why this matters: Helps find programs that reduce medication expenses.",
   retired: "Why this matters: Required for reduced vehicle registration fees in Pennsylvania.",
   ownsVehicle: "Why this matters: Needed to check eligibility for vehicle-related savings.",
   checkingBalance: "Why this matters: Some programs have resource or asset limits.",
-  savingsBalance: "Why this matters: Some programs have resource or asset limits.",
-  medicalCondition: "Why this matters: Some charities and grant programs open funds by diagnosis or disease category."
+  savingsBalance: "Why this matters: Some programs have resource or asset limits."
 };
 
 const emptyForm = {
   personName: "", dob: "", age: "", maritalStatus: "single", disability: "no", veteran: "no",
-  citizenStatus: "citizen", medicalCondition: "None selected", state: "PA", county: "", schoolDistrict: "",
+  citizenStatus: "citizen", state: "PA", county: "", schoolDistrict: "",
   householdSize: "1", livesAlone: "yes", needsSupervision: "no", cannotLiveAlone: "no",
   needsHelpDailyLiving: "no", nursingFacilityLevelCare: "no", housing: "rent", primaryResidence: "yes",
   monthlyRentMortgage: "", propertyTaxesPaid: "", utilitiesSeparate: "yes", monthlySocialSecurity: "",
   monthlySSI: "", monthlySSDI: "", monthlyPension: "", monthlyWages: "", monthlyInterest: "",
   monthlyOtherIncome: "", checkingBalance: "", savingsBalance: "", otherAssets: "", medicareA: "no",
-  medicareB: "no", medicareD: "no", medicaid: "no", prescriptionCosts: "", longTermCare: "no",
+  medicareB: "no", medicareD: "no", medicaid: "no", receivingSNAP: "no", receivingSSI: "no", receivingSSDI: "no", receivingOtherBenefits: "no", prescriptionCosts: "", longTermCare: "no",
   retired: "no", ownsVehicle: "no"
 };
 
@@ -123,8 +121,8 @@ function totalAssets(f) {
 }
 function completeness(f) {
   const keys = ["age","state","householdSize","housing","primaryResidence","monthlySocialSecurity","monthlySSI","monthlySSDI",
-    "checkingBalance","savingsBalance","disability","citizenStatus","medicareA","medicareB","medicareD",
-    "needsHelpDailyLiving","needsSupervision","cannotLiveAlone","nursingFacilityLevelCare","medicalCondition"];
+    "checkingBalance","savingsBalance","disability","veteran","citizenStatus","medicareA","medicareB","medicareD",
+    "receivingSNAP","receivingSSI","receivingSSDI","receivingOtherBenefits","needsHelpDailyLiving","needsSupervision","cannotLiveAlone","nursingFacilityLevelCare"];
   let count = 0;
   keys.forEach(k => { if (String(f[k] ?? "").trim() !== "") count += 1; });
   return count / keys.length;
@@ -138,23 +136,6 @@ function scoreLabel(score, fill) {
 function add(items, name, type, category, sourceType, description, docs, link, score, reason, missing, nextStep) {
   items.push({ name, type, category, sourceType, description, docs, link, score, reason, missing, nextStep });
 }
-function conditionContext(condition) {
-  const map = {
-    "Cancer": { label: "cancer-related grant and copay help", details: "Funds may cover treatment-related costs, premiums, copays, transportation, or medication support." },
-    "Diabetes": { label: "diabetes-related medication and supply help", details: "Funds may help with insulin, diabetes medications, supplies, and premium or copay support." },
-    "Heart disease": { label: "heart-disease financial help", details: "Funds may help with heart medications, specialty treatment costs, and premium or copay support." },
-    "COPD / lung disease": { label: "lung-disease financial help", details: "Funds may help with respiratory medications, oxygen-related care costs, and treatment copays." },
-    "Kidney disease": { label: "kidney-disease financial help", details: "Funds may help with dialysis-related medications, treatment copays, and specialty-care costs." },
-    "Multiple sclerosis": { label: "multiple-sclerosis financial help", details: "Funds may help with specialty medications, treatment copays, and disease-management costs." },
-    "Parkinson's disease": { label: "Parkinson's disease financial help", details: "Funds may help with medications, specialist visits, and related treatment expenses." },
-    "Rheumatoid arthritis": { label: "rheumatoid-arthritis financial help", details: "Funds may help with biologics, specialty medications, and treatment copays." },
-    "Rare disease": { label: "rare-disease assistance", details: "Rare-disease organizations may offer disease-specific grants, medication help, or travel support." },
-    "Traumatic brain injury": { label: "traumatic-brain-injury support", details: "Programs may help with rehabilitation, home supports, and disease-specific financial resources." },
-    "Other chronic disease": { label: "chronic-disease financial help", details: "Condition-based grant programs may still be available depending on diagnosis and treatment." },
-    "None selected": { label: "disease-specific help", details: "Choose a condition to narrow results." }
-  };
-  return map[condition] || map["Other chronic disease"];
-}
 function missingInfoPrompts(f) {
   const prompts = [];
   const age = Number(f.age || 0);
@@ -167,10 +148,13 @@ function missingInfoPrompts(f) {
   addPrompt("monthlySocialSecurity", "Enter Social Security income, even if it is $0.");
   addPrompt("monthlySSI", "Enter SSI income, even if it is $0.");
   addPrompt("monthlySSDI", "Enter SSDI income, even if it is $0.");
+  addPrompt("receivingSNAP", "Confirm whether you currently receive SNAP to improve food assistance screening.");
+  addPrompt("receivingSSI", "Confirm whether you currently receive SSI to improve cash assistance screening.");
+  addPrompt("receivingSSDI", "Confirm whether you currently receive SSDI to improve disability assistance screening.");
+  addPrompt("receivingOtherBenefits", "Confirm whether you currently receive other public benefits to improve screening.");
   addPrompt("checkingBalance", "Enter checking balance to improve SSI, Medicaid, and Medicare Savings screening.");
   addPrompt("savingsBalance", "Enter savings balance to improve SSI, Medicaid, and Extra Help screening.");
   if (String(f.citizenStatus ?? "").trim() === "" || f.citizenStatus === "other") prompts.push("Confirm citizenship or qualified status to improve SNAP, SSI, and Medicaid screening.");
-  if (f.medicalCondition === "None selected") prompts.push("Choose a medical condition if you want disease-specific grants and copay help options.");
   if (medicareRelevant) addPrompt("prescriptionCosts", "Enter prescription costs to improve Extra Help and prescription savings results.");
   if (careRelevant) {
     if (String(f.needsHelpDailyLiving ?? "").trim() === "" || f.needsHelpDailyLiving === "no") prompts.push("If help with daily living is needed, answer that to improve home-care and CHC results.");
@@ -191,12 +175,11 @@ function autoFlags(f, results) {
   if (f.state === "PA" && age >= 65 && f.housing === "own" && f.primaryResidence === "yes" && Number(f.propertyTaxesPaid || 0) > 0) {
     flags.push("PA homeowner: check both PA Property Tax / Rent Rebate and PA Homestead / Farmstead Exclusion.");
   }
-  if ((age >= 65 || f.disability === "yes") && income <= 1971 && ((f.maritalStatus === "married" && assets <= 3000) || (f.maritalStatus !== "married" && assets <= 2000))) {
-    flags.push("SSI looks especially strong based on income, age/disability, and assets entered.");
+  if ((age >= 65 || f.disability === "yes") && income <= 1300 && ((f.maritalStatus === "married" && assets <= 3000) || (f.maritalStatus !== "married" && assets <= 2000))) {
+    flags.push("SSI looks especially strong based on low income, age/disability, and assets entered.");
   }
-  if (f.medicalCondition !== "None selected") {
-    const ctx = conditionContext(f.medicalCondition);
-    flags.push(`Search ${ctx.label} because ${f.medicalCondition} was selected.`);
+  if (f.veteran === "yes") {
+    flags.push("Veteran status may qualify you for VA pension, healthcare, and additional veteran services.");
   }
   if (results.filter(r => r.sourceType === "official").length === 0) {
     flags.push("Use the official-links filter to focus only on government or official program sites.");
@@ -210,11 +193,11 @@ function buildResults(f) {
   const household = Math.max(1, Number(f.householdSize || 1));
   const fill = completeness(f);
   const items = [];
-  const ctx = conditionContext(f.medicalCondition);
 
   let ssiScore = 0;
   if (age >= 65 || f.disability === "yes") ssiScore += 35;
-  if (income <= 1971) ssiScore += 40;
+  if (f.receivingSSI === "yes") ssiScore = Math.max(ssiScore, 90);
+  if (income <= 1300) ssiScore += 40;
   if ((f.maritalStatus === "married" && assets <= 3000) || (f.maritalStatus !== "married" && assets <= 2000)) ssiScore += 20;
   if (f.citizenStatus !== "other") ssiScore += 5;
   add(items, "SSI", "Federal", "Cash / income", "official",
@@ -222,12 +205,13 @@ function buildResults(f) {
     "Photo ID, Social Security number, citizenship or qualified status, income proof, bank balances, housing costs.",
     "https://www.ssa.gov/ssi", ssiScore,
     "Matched because age/disability, income, assets, and citizenship status are used in SSI screening.",
-    ["Exact monthly income by source", "Checking and savings balances", "Citizenship or qualified status", "Living arrangement and housing cost proof"],
+    ["Age 65 or older or qualifying disability", "Countable income below SSI limits", "Countable resources below SSI limits", "U.S. citizenship or qualified non-citizen status"],
     "Open the official SSI page, gather your documents, then start the SSA application or screening process."
   );
 
   let snapScore = 0;
-  const snapLimit = 2550 + (household - 1) * 900;
+  const snapLimit = 1700 + (household - 1) * 650;
+  if (f.receivingSNAP === "yes") snapScore = Math.max(snapScore, 90);
   if (income <= snapLimit) snapScore += 70;
   if (f.housing === "rent" || Number(f.monthlyRentMortgage || 0) > 0) snapScore += 15;
   if (f.utilitiesSeparate === "yes") snapScore += 10;
@@ -243,7 +227,8 @@ function buildResults(f) {
 
   let medicaidScore = 0;
   if (f.disability === "yes" || age >= 65) medicaidScore += 35;
-  if (income <= 2200) medicaidScore += 30;
+  if (f.medicaid === "yes") medicaidScore = Math.max(medicaidScore, 90);
+  if (income <= 1800) medicaidScore += 30;
   if (assets <= 10000) medicaidScore += 20;
   if (f.citizenStatus !== "other") medicaidScore += 5;
   if (f.longTermCare === "yes" || f.needsHelpDailyLiving === "yes") medicaidScore += 10;
@@ -252,7 +237,7 @@ function buildResults(f) {
     "ID, citizenship or qualified status, medical records, income proof, bank balances, disability information.",
     STATES[f.state]?.portal || "https://www.medicaid.gov/", medicaidScore,
     "Matched because disability, age, income, assets, and care needs all strengthen Medicaid screening.",
-    ["Medical records or disability proof", "Bank balances", "Monthly income by source", "Care-need details"],
+    ["Age 65+ or qualifying disability or medical need", "Income below your state Medicaid limit", "Assets below your state resource limit", "U.S. citizenship or qualified non-citizen status"],
     "Use the official state portal to begin Medicaid screening and gather medical and financial records first."
   );
 
@@ -267,23 +252,91 @@ function buildResults(f) {
       "Medicare card, ID, citizenship or qualified status, income proof, bank balances.",
       "https://www.medicare.gov/basics/costs/help/medicare-savings-programs", msp,
       "Matched because Medicare status, income, assets, and citizenship help determine likely MSP eligibility.",
-      ["Medicare Part A/B status", "Income proof", "Checking and savings balances", "Citizenship or qualified status"],
+      ["Enrollment in Medicare Part A or B", "Income below your state’s MSP limit", "Assets within your state’s MSP resource limit", "U.S. citizenship or qualified non-citizen status"],
       "Open the official Medicare Savings page, then apply through the state Medicaid office or portal."
     );
 
     let extraHelp = 0;
     if (f.medicareD === "yes" || f.medicareA === "yes" || f.medicareB === "yes") extraHelp += 25;
-    if (income <= 2500) extraHelp += 40;
-    if (assets <= 18000) extraHelp += 20;
+    if (income <= 2400) extraHelp += 40;
+    if (assets <= 17000) extraHelp += 20;
     if (Number(f.prescriptionCosts || 0) > 0) extraHelp += 15;
     add(items, "Extra Help for Prescriptions", "Federal", "Medical / prescription savings", "official",
       "Help paying Medicare Part D prescription costs.",
       "Medicare information, citizenship or qualified status, prescription list, income and resource details.",
       "https://www.ssa.gov/extrahelp", extraHelp,
       "Matched because Medicare drug coverage, prescription costs, income, and assets matter for Extra Help.",
-      ["Prescription cost total", "Medicare Part D status", "Income details", "Resource totals"],
+      ["Enrollment in Medicare Part D", "Income within Extra Help limits", "Resources within Extra Help resource limits", "Prescription costs that make Part D unaffordable"],
       "Open the official Extra Help page and gather your Medicare and prescription information before applying."
     );
+
+    if (age >= 62) {
+      let ssRetirement = 60;
+      if (age >= 65) ssRetirement += 30;
+      if (f.maritalStatus === "married") ssRetirement += 10;
+      add(items, "Social Security Retirement Benefits", "Federal", "Cash / income", "official",
+        "Monthly retirement benefits based on your work history and earnings record.",
+        "Birth certificate, Social Security number, work history, marriage or divorce records if applicable.",
+        "https://www.ssa.gov/benefits/retirement/", ssRetirement,
+        "Matched because age 62 or older may qualify for Social Security retirement benefits.",
+        ["Proof of age", "Social Security number", "Work history documentation"],
+        "Open the official SSA retirement page to estimate benefits and start your application."
+      );
+    }
+
+    if (f.disability === "yes" || f.receivingSSDI === "yes") {
+      let ssdi = 50;
+      if (Number(f.monthlySSDI || 0) > 0 || f.receivingSSDI === "yes") ssdi = 100;
+      add(items, "Social Security Disability Insurance (SSDI)", "Federal", "Cash / income", "official",
+        "Monthly cash benefits for people with disabilities who have paid into Social Security.",
+        "Recent medical records, work history, Social Security number, income proof.",
+        "https://www.ssa.gov/benefits/disability/", ssdi,
+        "Matched because disability status may qualify for SSDI when work credits and medical evidence are present.",
+        ["Qualifying disability that prevents substantial gainful activity", "Sufficient Social Security work credits", "Recent medical evidence of the disability"],
+        "Open the official SSDI page and review disability application requirements."
+      );
+    }
+
+    let liheapScore = 0;
+    if (income <= 2500) liheapScore += 50;
+    if (f.housing === "rent" || f.utilitiesSeparate === "yes") liheapScore += 25;
+    if (age >= 60 || f.disability === "yes") liheapScore += 15;
+    add(items, "LIHEAP Energy Assistance", "Federal / State", "Utilities / energy", "official",
+      "Helps pay heating and cooling bills, weatherization, or home energy repairs for low-income households.",
+      "Income proof, utility bills, ID, Social Security numbers for household members.",
+      "https://www.acf.hhs.gov/ocs/low-income-home-energy-assistance-program-liheap", liheapScore,
+      "Matched because low household income and utility responsibility may qualify for LIHEAP.",
+      ["Household income below state LIHEAP limits", "Responsibility for home heating or cooling bills", "Residency in the state offering LIHEAP"],
+      "Open the LIHEAP page and locate your state agency to apply." 
+    );
+
+    let section8Score = 0;
+    if (f.housing === "rent" || f.housing === "live_with_family") section8Score += 60;
+    if (income <= 3000) section8Score += 25;
+    if (household > 1) section8Score += 15;
+    add(items, "Section 8 Housing Choice Voucher", "Federal", "Housing", "official",
+      "Rent assistance vouchers for eligible low-income households, including seniors and people with disabilities.",
+      "Income proof, ID, household size, current rent or lease agreement.",
+      "https://www.hud.gov/topics/housing_choice_voucher_program_section_8", section8Score,
+      "Matched because low income and rental housing often qualify applicants for housing choice vouchers.",
+      ["Income below area median income limits", "Need for rental housing assistance", "Household size and composition"],
+      "Open the HUD Section 8 page and contact your local public housing agency to learn about applications."
+    );
+
+    if (f.veteran === "yes") {
+      let vaScore = 75;
+      if (age >= 65) vaScore += 10;
+      if (f.disability === "yes") vaScore += 10;
+      add(items, "VA Benefits & Pension", "Federal", "Veteran support", "official",
+        "VA health care, disability compensation, pension, and other benefits for eligible veterans.",
+        "DD214 or separation papers, income and net worth documentation, medical records if applying for pension or disability.",
+        "https://www.va.gov/benefits/", vaScore,
+        "Matched because veteran status can unlock VA pension, health, and disability benefits.",
+        ["Veteran status with qualifying service record", "Qualifying discharge status", "Income and net worth within VA pension limits"],
+        "Open the VA benefits page and review your eligibility for VA pension, healthcare, and disability support."
+      );
+    }
+
   }
 
   const statePortal = STATES[f.state]?.portal || "https://www.benefits.gov/benefit-finder";
@@ -292,61 +345,24 @@ function buildResults(f) {
     "Official state portal for food, medical, cash, utility, and other support programs.",
     "ID, address, income proof, household size.", statePortal, 100,
     "This is an official entry point for your state’s benefit programs.",
-    ["Basic identity and address info", "Income details", "Household size"],
+    ["Residency in the selected state", "Basic identity information", "Household size and income details"],
     "Open the official portal and review the benefit categories that match your situation."
+  );
+  add(items, "MissingMoney.com", "Federal / State", "Unclaimed money", "official",
+    "Free nationwide search for unclaimed property across all 50 states.",
+    "Your full legal name and prior addresses, if available.",
+    "https://www.missingmoney.com/", 100,
+    "Matched because anyone can have unclaimed property, regardless of income, age, or benefits status.",
+    ["Anyone can search for unclaimed property", "No income or age requirement", "Your name and prior addresses"],
+    "Open MissingMoney.com and search your name across all participating states."
   );
   add(items, `${f.state} Unclaimed Money`, "State", "Unclaimed money", "official",
     "Search for unclaimed money, dormant accounts, old refunds, or property owed to you.",
     "Your name and current or past address.", stateUnclaimed, 100,
     "This is worth checking because unclaimed property searches do not depend on income eligibility.",
-    ["Full legal name", "Current and past addresses"],
+    ["A name or address match in the unclaimed property database", "Proof of identity to claim found assets"],
     "Open the official unclaimed property search and try your name plus previous addresses."
   );
-
-  if (f.medicalCondition !== "None selected") {
-    add(items, `${f.medicalCondition} grant search - PAN Foundation`, "National charity", "Disease-specific grants", "charity",
-      `Search ${ctx.label} through PAN Foundation. ${ctx.details}`,
-      "Diagnosis name, medication list, insurance information, household income.",
-      "https://www.panfoundation.org/find-disease-fund/", 92,
-      `Matched because ${f.medicalCondition} was selected and PAN often organizes help by disease fund.`,
-      ["Diagnosis confirmation", "Medication list", "Insurance information", "Household income"],
-      "Open PAN Foundation, search the disease fund, and check whether the fund is open today."
-    );
-    add(items, `${f.medicalCondition} fund alerts - PAN FundFinder`, "National charity", "Disease-specific grants", "charity",
-      `Track disease-fund openings related to ${f.medicalCondition}. ${ctx.details}`,
-      "Email address and diagnosis or disease category.",
-      "https://www.panfoundation.org/fundfinder/", 90,
-      "Matched because this tool can alert you when disease funds open for the selected condition.",
-      ["Diagnosis name", "Email address"],
-      "Open FundFinder and sign up for alerts for the selected diagnosis."
-    );
-    add(items, `${f.medicalCondition} support - HealthWell`, "National charity", "Disease-specific grants", "charity",
-      `Check open HealthWell funds connected to ${f.medicalCondition}. ${ctx.details}`,
-      "Diagnosis, treatment or medication, insurance information, income.",
-      "https://www.healthwellfoundation.org/disease-funds/", 90,
-      "Matched because HealthWell disease funds are often tied to diagnosis and treatment type.",
-      ["Diagnosis details", "Treatment or medication name", "Insurance information", "Income"],
-      "Open HealthWell’s disease fund page and search for the selected condition."
-    );
-    if (f.medicalCondition === "Rare disease") {
-      add(items, "Rare disease assistance - NORD", "National charity", "Rare disease help", "charity",
-        "Rare-disease medication, premium, co-pay, travel, and related patient assistance resources.",
-        "Diagnosis details, provider information, treatment plan, financial information.",
-        "https://rarediseases.org/patient-assistance/", 94,
-        "Matched because NORD is especially relevant when a rare disease is selected.",
-        ["Rare disease diagnosis", "Provider information", "Treatment plan", "Financial details"],
-        "Open NORD patient assistance and review rare-disease support options."
-      );
-    }
-    add(items, `${f.medicalCondition} copay relief - Patient Advocate Foundation`, "National charity", "Disease-specific grants", "charity",
-      `Check co-pay relief and financial aid options related to ${f.medicalCondition}. ${ctx.details}`,
-      "Diagnosis, treatment details, insurance details, household income.",
-      "https://www.patientadvocate.org/connect-with-services/copay-relief/", 88,
-      "Matched because copay relief often depends on diagnosis, treatment, and insurance type.",
-      ["Diagnosis", "Treatment details", "Insurance card", "Income"],
-      "Open the co-pay relief page and review open funds for your diagnosis."
-    );
-  }
 
   if (f.state === "PA") {
     let vehicle = 0;
@@ -359,7 +375,7 @@ function buildResults(f) {
       "Vehicle registration, proof of retirement or retired status, income information, PennDOT form.",
       "https://www.pa.gov/services/dmv/apply-for-retired-status-vehicle-registration", vehicle,
       "Matched because retired status, vehicle ownership, income, and age all make this more relevant.",
-      ["Retired status", "Vehicle ownership", "Income amount", "PennDOT form"],
+      ["Pennsylvania residency", "Age 65 or older", "Retired status", "Vehicle ownership and registration eligibility"],
       "Open the PennDOT page and gather the retired-status registration form and income proof."
     );
   }
@@ -405,8 +421,9 @@ function DetailDrawer({ item, onClose }) {
           <p>{item.description}</p>
         </div>
         <div className="drawerSection">
-          <strong>What is still missing</strong>
-          {item.missing && item.missing.length > 0 ? item.missing.map((m, i) => <div key={i} className="listLine">• {m}</div>) : <p>No major missing items flagged.</p>}
+          <strong>What you need to qualify</strong>
+          <p>This is the eligibility criteria the program typically requires. If you meet these conditions, the benefit is worth pursuing.</p>
+          {item.missing && item.missing.length > 0 ? item.missing.map((m, i) => <div key={i} className="listLine">• {m}</div>) : <p>No major eligibility criteria flagged.</p>}
         </div>
         <div className="drawerSection">
           <strong>Documents to gather</strong>
@@ -432,6 +449,8 @@ export default function App() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedProfileName, setSelectedProfileName] = useState("");
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -457,9 +476,10 @@ export default function App() {
     const name = form.personName?.trim() || `Profile ${profiles.length + 1}`;
     const next = [...profiles.filter(p => p.personName !== name), { ...form, personName: name }];
     setProfiles(next);
+    setSelectedProfileName(name);
     localStorage.setItem("benefits-profiles", JSON.stringify(next));
   }
-  function loadProfile(p) { setForm(p); setResults(buildResults(p)); setPage(3); }
+  function loadProfile(p) { setForm(p); setResults(buildResults(p)); setPage(3); setSelectedProfileName(p.personName || ""); setProfileMenuOpen(false); }
   function removeProfile(name) {
     const next = profiles.filter(p => p.personName !== name);
     setProfiles(next);
@@ -473,6 +493,13 @@ export default function App() {
   const previewResults = useMemo(() => (results.length ? results : buildResults(form)), [results, form]);
   const flags = useMemo(() => autoFlags(form, previewResults), [form, previewResults]);
   const prompts = useMemo(() => missingInfoPrompts(form), [form]);
+  const benefitSummary = useMemo(() => {
+    const official = previewResults.filter(r => r.sourceType === "official");
+    return {
+      likely: official.filter(r => r.score >= 90),
+      apply: official.filter(r => r.score >= 55 && r.score < 90)
+    };
+  }, [previewResults]);
 
   const showMedicareQuestions = Number(form.age || 0) >= 65 || form.disability === "yes" || form.medicareA === "yes" || form.medicareB === "yes";
   const showCareQuestions = form.disability === "yes" || Number(form.age || 0) >= 60 || form.longTermCare === "yes";
@@ -487,13 +514,30 @@ export default function App() {
   return (
     <div className="shell">
       <div className="wrap">
-        <div className="hero"><div><h1>Benefits Finder Pro</h1></div></div>
-
-        <div className="tabs">
-          <button className={page===1?"active":""} onClick={() => setPage(1)}>Basic Info</button>
-          <button className={page===2?"active":""} onClick={() => setPage(2)}>Eligibility Details</button>
-          <button className={page===3?"active":""} onClick={() => setPage(3)}>Results</button>
+        <div className="topBar">
+          <div className="topBarHeader">
+            <div className="hero"><div><h1>Benefits Finder Pro</h1></div></div>
+            <div className="profileArea">
+              <button className="profileButton" onClick={() => setProfileMenuOpen(prev => !prev)}>{selectedProfileName || "No profile loaded"}</button>
+              {profileMenuOpen && (
+                <div className="profileDropdown">
+                  <div className="profileDropdownHeader">Saved profiles</div>
+                  {profiles.length === 0 ? (
+                    <div className="empty">No saved profiles yet.</div>
+                  ) : profiles.map((p, i) => (
+                    <button key={i} className="profileDropdownItem" onClick={() => loadProfile(p)}>{p.personName || `Profile ${i + 1}`}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="tabs">
+            <button className={page===1?"active":""} onClick={() => setPage(1)}>Basic Info</button>
+            <button className={page===2?"active":""} onClick={() => setPage(2)}>Eligibility Details</button>
+            <button className={page===3?"active":""} onClick={() => setPage(3)}>Results</button>
+          </div>
         </div>
+        {profileMenuOpen && <div className="dropdownBackdrop" onClick={() => setProfileMenuOpen(false)} />}
 
         {(page === 1 || page === 2) && prompts.length > 0 && (
           <div className="card">
@@ -546,7 +590,7 @@ export default function App() {
             </div>
             <div className="row">
               <div><label>Citizenship / status</label><HelpText field="citizenStatus" /><select value={form.citizenStatus} onChange={e => updateField("citizenStatus", e.target.value)}><option value="citizen">U.S. citizen</option><option value="qualified">Qualified non-citizen</option><option value="other">Other / not sure</option></select></div>
-              <div><label>Medical condition</label><HelpText field="medicalCondition" /><select value={form.medicalCondition} onChange={e => updateField("medicalCondition", e.target.value)}>{CONDITIONS.map(cond => <option key={cond} value={cond}>{cond}</option>)}</select></div>
+              <div><label>Veteran status</label><HelpText field="veteran" /><select value={form.veteran} onChange={e => updateField("veteran", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select></div>
             </div>
             <div className="row">
               <div><label>State</label><select value={form.state} onChange={e => updateField("state", e.target.value)}>{ALL_STATES.map(abbr => <option key={abbr} value={abbr}>{abbr}</option>)}</select></div>
@@ -574,6 +618,14 @@ export default function App() {
             <div className="row">
               <div><label>Primary residence</label><select value={form.primaryResidence} onChange={e => updateField("primaryResidence", e.target.value)}><option value="yes">Yes</option><option value="no">No</option></select></div>
               <div><label>Utilities separate</label><select value={form.utilitiesSeparate} onChange={e => updateField("utilitiesSeparate", e.target.value)}><option value="yes">Yes</option><option value="no">No</option></select></div>
+            </div>
+            <div className="row">
+              <div><label>Currently receive SNAP</label><HelpText field="receivingSNAP" /><select value={form.receivingSNAP} onChange={e => updateField("receivingSNAP", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select></div>
+              <div><label>Currently receive SSI</label><HelpText field="receivingSSI" /><select value={form.receivingSSI} onChange={e => updateField("receivingSSI", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select></div>
+            </div>
+            <div className="row">
+              <div><label>Currently receive SSDI</label><HelpText field="receivingSSDI" /><select value={form.receivingSSDI} onChange={e => updateField("receivingSSDI", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select></div>
+              <div><label>Other public benefits</label><HelpText field="receivingOtherBenefits" /><select value={form.receivingOtherBenefits} onChange={e => updateField("receivingOtherBenefits", e.target.value)}><option value="no">No</option><option value="yes">Yes</option></select></div>
             </div>
             {showCareQuestions && (
               <>
@@ -637,6 +689,12 @@ export default function App() {
             <ConfidenceMeter value={fill} />
             {prompts.length > 0 && <div className="flags"><strong>Missing information that would improve accuracy</strong>{prompts.map((p, i) => <div key={i} className="flagItem">• {p}</div>)}</div>}
             {flags.length > 0 && <div className="flags"><strong>Auto flags</strong>{flags.map((flag, i) => <div key={i} className="flagItem">• {flag}</div>)}</div>}
+            <div className="summaryCard">
+              <h3>Quick benefit summary</h3>
+              <div className="flagItem">{form.receivingOtherBenefits === "yes" ? "You have reported other public benefits; review the listed programs for supplemental support." : "No other public benefits are recorded; answer the field to improve your screening."}</div>
+              <div className="flagItem">Programs likely already relevant: {benefitSummary.likely.length}</div>
+              <div className="flagItem">Programs still worth applying for: {benefitSummary.apply.length}</div>
+            </div>
 
             <div className="filterBar">
               <div><label>Result source</label><select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}><option value="all">All results</option><option value="official">Official links only</option><option value="charity">Grant / charity only</option></select></div>

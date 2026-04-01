@@ -56,6 +56,74 @@ a { color:#1455af; font-weight:700; }
   .dobRow { grid-template-columns: 1fr 1fr 1fr; }
 }
 
+.topBar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: #fff;
+  padding-top: 18px;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 18px rgba(18,56,94,.08);
+}
+.topBarHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.profileArea {
+  position: relative;
+  min-width: 240px;
+  display: flex;
+  justify-content: flex-end;
+}
+.profileButton {
+  background: #dfeaf9;
+  color: #18487e;
+  border: 1px solid #bfd0df;
+  border-radius: 14px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 700;
+  width: 100%;
+  text-align: left;
+}
+.profileDropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: min(320px, 100vw);
+  background: #fff;
+  border: 1px solid #dbe8f3;
+  border-radius: 16px;
+  box-shadow: 0 16px 32px rgba(18,56,94,.12);
+  padding: 12px;
+  z-index: 50;
+}
+.profileDropdownHeader {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.profileDropdownItem {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  background: #f7fbff;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  color: #15324b;
+}
+.profileDropdownItem:last-child { margin-bottom: 0; }
+.dropdownBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: transparent;
+}
 
 /* Mobile-friendly form controls */
 input, select, button {
