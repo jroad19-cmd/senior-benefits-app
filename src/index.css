@@ -15,8 +15,8 @@ button { min-height:50px; border:0; border-radius:12px; background:#1f5fbf; colo
 button.secondary { background:#dfeaf9; color:#18487e; }
 button.danger { background:#f8d7da; color:#7c1d28; }
 .tabs, .row, .actions, .summary, .saved, .miniActions, .resultTop, .confidenceTop, .filterBar, .resultButtons, .drawerHeader { display:flex; gap:12px; }
-.tabs { margin-bottom:16px; }
-.tabs button { flex:1; background:#dfeaf9; color:#18487e; }
+.tabs { margin-bottom:16px; flex-wrap:nowrap; overflow-x:auto; }
+.tabs button { flex:1; min-width:0; background:#dfeaf9; color:#18487e; white-space: nowrap; }
 .tabs button.active { background:#1f5fbf; color:#fff; }
 .row > div, .summary > div, .actions button, .filterBar > div { flex:1; }
 .grid3 { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; }
@@ -45,9 +45,19 @@ a { color:#1455af; font-weight:700; }
 .drawerSection { background:#f7fbff; border:1px solid #dbe8f3; border-radius:12px; padding:12px; margin-bottom:12px; }
 .drawerFooter { margin-top:16px; }
 @media (max-width: 900px) {
-  .tabs, .row, .actions, .summary, .saved, .miniActions, .resultTop, .confidenceTop, .filterBar, .resultButtons, .drawerHeader { flex-direction:column; }
+  .row, .actions, .summary, .saved, .miniActions, .resultTop, .confidenceTop, .filterBar, .resultButtons, .drawerHeader { flex-direction:column; }
+  .tabs { flex-direction:row; gap:8px; }
+  .tabs button { padding:10px 8px; font-size:14px; }
   .grid3 { grid-template-columns: 1fr; }
   .hero h1 { font-size:28px; }
+  .profileArea { min-width:auto; max-width:280px; }
+  .profileButton { padding:10px 12px; font-size:14px; white-space: nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .topBarHeader { align-items:center; }
+}
+@media (max-width: 640px) {
+  .tabs button { font-size:12px; padding:8px 6px; }
+  .profileButton { font-size:13px; padding:8px 10px; }
+  .hero h1 { font-size:24px; }
 }
 
 
