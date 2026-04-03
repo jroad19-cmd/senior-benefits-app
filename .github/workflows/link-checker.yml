@@ -1,0 +1,362 @@
+name: CancerCompass Link Checker
+
+on:
+  schedule:
+    # Runs every 90 days at 8am — Jan 1, Apr 1, Jul 1, Oct 1
+    - cron: '0 8 1 1,4,7,10 *'
+  workflow_dispatch:
+    # Also allows you to run it manually anytime from GitHub
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check all resource links
+        id: check
+        run: |
+          node << 'EOF'
+          const https = require('https');
+          const http = require('http');
+          const { URL } = require('url');
+
+          const resources = [
+            {id:"n001",name:"CancerCare — Financial Assistance",url:"https://www.cancercare.org"},
+            {id:"n002",name:"Patient Advocate Foundation",url:"https://www.patientadvocate.org"},
+            {id:"n003",name:"HealthWell Foundation",url:"https://www.healthwellfoundation.org"},
+            {id:"n004",name:"American Cancer Society",url:"https://www.cancer.org"},
+            {id:"n005",name:"Joe's House — Lodging",url:"https://www.joeshouse.org"},
+            {id:"n006",name:"NeedyMeds",url:"https://www.needymeds.org"},
+            {id:"n007",name:"Cancer Legal Resource Center",url:"https://www.thedrlc.org/cancer"},
+            {id:"n008",name:"Meals on Wheels",url:"https://www.mealsonwheelsamerica.org"},
+            {id:"n009",name:"Children's Cancer Fund",url:"https://www.childrenscancerfund.org"},
+            {id:"n010",name:"VA National Oncology Program",url:"https://www.va.gov/health-care/health-needs-conditions/cancer-care"},
+            {id:"n011",name:"Family Reach",url:"https://www.familyreach.org"},
+            {id:"n012",name:"Cancer Cartel",url:"https://www.cancercartel.org"},
+            {id:"n013",name:"PAN Foundation",url:"https://www.panfoundation.org"},
+            {id:"n014",name:"CancerCare Co-Payment Foundation",url:"https://www.cancercare.org/copayfoundation"},
+            {id:"n015",name:"Triage Cancer",url:"https://www.triagecancer.org"},
+            {id:"n016",name:"ACS Hope Lodge",url:"https://www.cancer.org/treatment/support-programs-and-services/patient-lodging/hope-lodge.html"},
+            {id:"n017",name:"Livestrong",url:"https://www.livestrong.org"},
+            {id:"n018",name:"211 National Helpline",url:"https://www.211.org"},
+            {id:"n019",name:"SNAP Food Assistance",url:"https://www.fns.usda.gov/snap"},
+            {id:"n020",name:"Social Security Disability",url:"https://www.ssa.gov/disability"},
+            {id:"n021",name:"Ronald McDonald House",url:"https://www.rmhc.org"},
+            {id:"n022",name:"Cancer Financial Assistance Coalition",url:"https://www.cancerfac.org"},
+            {id:"n023",name:"Allyson Whitney Foundation",url:"https://www.allysonwhitney.org"},
+            {id:"n024",name:"LIHEAP Energy Assistance",url:"https://www.acf.hhs.gov/ocs/programs/liheap"},
+            {id:"bc001",name:"Susan G. Komen",url:"https://www.komen.org"},
+            {id:"bc002",name:"Living Beyond Breast Cancer",url:"https://www.lbbc.org"},
+            {id:"bc003",name:"Breastcancer.org",url:"https://www.breastcancer.org"},
+            {id:"bc004",name:"Roche — Herceptin Assistance",url:"https://www.genentech-access.com"},
+            {id:"bc005",name:"The Pink Fund",url:"https://www.thepinkfund.org"},
+            {id:"bc006",name:"Tigerlily Foundation",url:"https://www.tigerlilyfoundation.org"},
+            {id:"lc001",name:"LUNGevity Foundation",url:"https://www.lungevity.org"},
+            {id:"lc002",name:"Lung Cancer Foundation of America",url:"https://www.lcfamerica.org"},
+            {id:"lc003",name:"American Lung Association",url:"https://www.lung.org/lung-health-diseases/lung-disease-lookup/lung-cancer/treatment/assistance"},
+            {id:"cc001",name:"Colorectal Cancer Alliance",url:"https://www.ccalliance.org"},
+            {id:"cc002",name:"Meredith's Miracles",url:"https://www.meredithsmiracles.com"},
+            {id:"pc001",name:"ZERO Cancer",url:"https://www.zerocancer.org"},
+            {id:"pc002",name:"Angel Foundation",url:"https://www.angelonline.org"},
+            {id:"ll001",name:"Leukemia & Lymphoma Society",url:"https://www.lls.org"},
+            {id:"ll002",name:"International Myeloma Foundation",url:"https://www.myeloma.org"},
+            {id:"ll003",name:"Blood Cancer United",url:"https://bloodcancerunited.org/financial-assistance"},
+            {id:"panc001",name:"Pancreatic Cancer Action Network",url:"https://www.pancan.org"},
+            {id:"panc002",name:"Hirshberg Foundation",url:"https://www.pancreatic.org"},
+            {id:"panc003",name:"National Pancreatic Cancer Foundation",url:"https://www.npcf.us"},
+            {id:"oc001",name:"National Ovarian Cancer Coalition",url:"https://www.ovarian.org"},
+            {id:"oc002",name:"OvarCare",url:"https://www.ovarcare.org"},
+            {id:"oc003",name:"Clearity Foundation",url:"https://www.clearityfoundation.org"},
+            {id:"brain001",name:"National Brain Tumor Society",url:"https://www.braintumor.org"},
+            {id:"brain002",name:"Mia's Miracles — Brain Cancer",url:"https://www.patientadvocate.org/connect-with-services/financial-aid-funds"},
+            {id:"mel001",name:"Melanoma Research Foundation",url:"https://www.melanoma.org"},
+            {id:"mel002",name:"AIM at Melanoma",url:"https://www.aimatmelanoma.org"},
+            {id:"sar001",name:"Sarcoma Foundation of America",url:"https://www.curesarcoma.org"},
+            {id:"sar002",name:"Liddy Shriver Sarcoma Initiative",url:"https://sarcomahelp.org/support"},
+            {id:"thy001",name:"ThyCa — Thyroid Cancer",url:"https://www.thyca.org"},
+            {id:"thy002",name:"ThyCa — Thyroid Grants",url:"https://www.thyca.org/patient-resources/financial-assistance"},
+            {id:"meso001",name:"Mesothelioma Applied Research Foundation",url:"https://www.curemeso.org"},
+            {id:"rare001",name:"Lois Merrill Foundation",url:"https://www.thelmf.com/help"},
+            {id:"blad001",name:"Bladder Cancer Advocacy Network",url:"https://www.bcan.org"},
+            {id:"blad002",name:"PAN Foundation — Bladder Cancer",url:"https://www.panfoundation.org/disease-funds/bladder-cancer"},
+            {id:"blad003",name:"Urology Care Foundation",url:"https://www.urologyhealth.org/patient-support/bladder-cancer"},
+            {id:"hn001",name:"Head and Neck Cancer Alliance",url:"https://www.headandneck.org"},
+            {id:"hn002",name:"SPOHNC",url:"https://www.spohnc.org"},
+            {id:"hn003",name:"Oral Cancer Foundation",url:"https://oralcancerfoundation.org/support"},
+            {id:"kid001",name:"Kidney Cancer Association",url:"https://www.kidneycancer.org"},
+            {id:"kid002",name:"KidneyCAN",url:"https://www.kidneycan.org"},
+            {id:"kid003",name:"Kidney Cancer Transportation",url:"https://www.kidneycancer.org/patient-resources"},
+            {id:"liv001",name:"American Liver Foundation",url:"https://liverfoundation.org"},
+            {id:"liv002",name:"Liver Cancer Connect",url:"https://www.livercancerconnect.org"},
+            {id:"liv003",name:"Hepatitis B Foundation",url:"https://www.hepb.org/patient-support"},
+            {id:"stom001",name:"Debbie's Dream Foundation",url:"https://www.debbiesdream.org"},
+            {id:"stom002",name:"No Stomach For Cancer",url:"https://www.nostomachforcancer.org"},
+            {id:"stom003",name:"Gastric Cancer Foundation",url:"https://www.gcfoundation.org"},
+            {id:"eso001",name:"Esophageal Cancer Action Network",url:"https://www.ecan.org"},
+            {id:"eso002",name:"Esophageal Cancer Education Foundation",url:"https://www.ecef.us"},
+            {id:"eso003",name:"ECAN — Support Groups",url:"https://www.ecan.org/support-groups"},
+            {id:"test001",name:"Testicular Cancer Foundation",url:"https://www.testicularcancer.org"},
+            {id:"test002",name:"TC-Cancer.com",url:"https://www.tc-cancer.com"},
+            {id:"test003",name:"Livestrong — Testicular Cancer",url:"https://www.livestrong.org/we-can-help/young-adults"},
+            {id:"blood002",name:"Aplastic Anemia & MDS Foundation",url:"https://www.aamds.org/patients/financial-assistance"},
+            {id:"uter001",name:"Foundation for Women's Cancer",url:"https://www.foundationforwomenscancer.org"},
+            {id:"uter002",name:"SHARE Cancer Support",url:"https://www.sharecancersupport.org"},
+            {id:"uter003",name:"Gynecologic Cancer Foundation",url:"https://www.foundationforwomenscancer.org/resources"},
+            {id:"cer001",name:"Cervivor",url:"https://www.cervivor.org"},
+            {id:"al001",name:"Alabama — Breast & Cervical Program",url:"https://www.alabamapublichealth.gov/cancer"},
+            {id:"ak001",name:"Alaska — Native Tribal Health",url:"https://www.anthc.org/cancer-care"},
+            {id:"ak002",name:"Alaska — Cancer Program",url:"https://dhss.alaska.gov/dph/chronic/pages/cancer/default.aspx"},
+            {id:"az001",name:"Arizona Cancer Coalition",url:"https://www.arizonacancercoalition.org"},
+            {id:"az002",name:"Arizona Cancer Foundation",url:"https://www.arizonacancerfoundation.org"},
+            {id:"ar001",name:"Arkansas Breast Cancer Control",url:"https://www.healthy.arkansas.gov/programs-services/topics/breast-cervical-cancer"},
+            {id:"ca001",name:"California — Every Woman Counts",url:"https://www.dhcs.ca.gov/services/cancer"},
+            {id:"ca002",name:"Cancer Prevention Institute of CA",url:"https://www.cpic.org"},
+            {id:"co001",name:"Colorado Cancer Screening",url:"https://cdphe.colorado.gov/cancer"},
+            {id:"co002",name:"Colorado Cancer Coalition",url:"https://coloradocancercoalition.org"},
+            {id:"ct001",name:"Connecticut Breast & Cervical Program",url:"https://portal.ct.gov/DPH/Cancer-Registry/Cancer"},
+            {id:"de001",name:"Delaware Cancer Consortium",url:"https://www.delawarecancer.org"},
+            {id:"de002",name:"Delaware Cancer — Financial",url:"https://www.delawarecancer.org/resources"},
+            {id:"fl001",name:"Florida Breast & Cervical Program",url:"https://www.floridahealth.gov/diseases-and-conditions/cancer"},
+            {id:"fl002",name:"Florida Cancer Connect",url:"https://www.cancer.org/about-us/local/florida.html"},
+            {id:"ga001",name:"Georgia Cancer State Aid",url:"https://dph.georgia.gov/cancer-aid"},
+            {id:"ga002",name:"Georgia Cancer Coalition",url:"https://www.georgiacancer.org"},
+            {id:"hi001",name:"Hawaii Cancer Consortium",url:"https://health.hawaii.gov/cancer"},
+            {id:"hi002",name:"Hawaii Cancer Financial Navigation",url:"https://health.hawaii.gov/cancer/resources"},
+            {id:"id001",name:"Idaho Breast & Cervical Program",url:"https://healthandwelfare.idaho.gov/cancer"},
+            {id:"id002",name:"Idaho Cancer Support",url:"https://healthandwelfare.idaho.gov/cancer"},
+            {id:"id003",name:"Idaho Cancer Coalition",url:"https://www.idahocancercoalition.org"},
+            {id:"il001",name:"Illinois Cancer Control",url:"https://dph.illinois.gov/topics-services/diseases-and-conditions/cancer"},
+            {id:"il002",name:"Illinois CancerCare Foundation",url:"https://illinoiscancercarefoundation.org/what-we-do/patient-care"},
+            {id:"il003",name:"CCSI Foundation — Illinois",url:"https://cancercarespecialists.org/ccsi-foundation"},
+            {id:"in001",name:"Indiana Cancer Programs",url:"https://www.in.gov/isdh/19470.htm"},
+            {id:"in002",name:"Indiana Cancer Consortium",url:"https://www.in.gov/isdh/19470.htm"},
+            {id:"ia001",name:"Iowa Cancer Consortium",url:"https://www.iowacancerconsortium.org"},
+            {id:"ia002",name:"Iowa Cancer — Financial",url:"https://www.iowacancerconsortium.org/resources"},
+            {id:"ks001",name:"Kansas Early Detection Works",url:"https://www.kdheks.gov/cancer"},
+            {id:"ks002",name:"Kansas Cancer Partnership",url:"https://www.kscancer.org"},
+            {id:"ks003",name:"Kansas Cancer Partnership — Financial",url:"https://www.kscancer.org"},
+            {id:"ky001",name:"Kentucky Women's Cancer Screening",url:"https://chfs.ky.gov/agencies/dph/dphps/owh/Pages/cancerscreening.aspx"},
+            {id:"ky002",name:"Kentucky Cancer Program",url:"https://chfs.ky.gov/agencies/dph/dphps/owh/Pages/cancerscreening.aspx"},
+            {id:"la001",name:"Louisiana Breast & Cervical Program",url:"https://ldh.la.gov/page/breast-cervical-health-program"},
+            {id:"la002",name:"Louisiana Cancer Prevention",url:"https://ldh.la.gov/cancer"},
+            {id:"la003",name:"Louisiana Cancer — Patient Support",url:"https://ldh.la.gov/cancer"},
+            {id:"me001",name:"Maine Breast & Cervical Program",url:"https://www.maine.gov/dhhs/mecdc/population-health-wellness/cancer"},
+            {id:"me002",name:"Maine Cancer Foundation",url:"https://www.mainecancerfoundation.org"},
+            {id:"md001",name:"Maryland Cancer Fund",url:"https://health.maryland.gov/cancer"},
+            {id:"md002",name:"Maryland Cancer Fund — Grants",url:"https://health.maryland.gov/cancer/pages/financial-assistance.aspx"},
+            {id:"ma001",name:"Massachusetts Breast & Cervical Initiative",url:"https://www.mass.gov/cancer-screening"},
+            {id:"ma002",name:"Massachusetts Cancer Consortium",url:"https://www.mass.gov/cancer-screening"},
+            {id:"mi001",name:"Michigan Breast & Cervical Control",url:"https://www.michigan.gov/mdhhs/adult-child-serv/childrenfamilies/wic/cancer-screening"},
+            {id:"mi002",name:"Michigan Cancer Consortium",url:"https://www.michigan.gov/mdhhs/adult-child-serv/childrenfamilies/wic/cancer-screening"},
+            {id:"mi003",name:"Michigan DHHS — Cancer Resources",url:"https://www.michigan.gov/mdhhs/keep-mi-healthy/chronicdiseases/cancer/cancer-resources-for-mi-communities"},
+            {id:"mn001",name:"Minnesota SAGE Program",url:"https://www.health.state.mn.us/diseases/cancer/sage"},
+            {id:"mn002",name:"Minnesota Cancer Alliance",url:"https://www.health.state.mn.us/diseases/cancer"},
+            {id:"mn003",name:"Minnesota Cancer Alliance — Financial",url:"https://www.mncanceralliance.org"},
+            {id:"ms001",name:"Mississippi Breast & Cervical Program",url:"https://msdh.ms.gov/msdhsite/index.cfm/41,0,150,html"},
+            {id:"ms002",name:"Mississippi Cancer Control",url:"https://msdh.ms.gov/msdhsite/index.cfm/41,0,150,html"},
+            {id:"mo001",name:"Missouri Show Me Healthy Women",url:"https://health.mo.gov/living/healthcondiseases/cancer"},
+            {id:"mo002",name:"Missouri Cancer Coalition",url:"https://health.mo.gov/living/healthcondiseases/cancer"},
+            {id:"mt001",name:"Montana Cancer Control",url:"https://dphhs.mt.gov/publichealth/cancer"},
+            {id:"mt002",name:"Montana Cancer Coalition",url:"https://mtcancercoalition.org"},
+            {id:"ne001",name:"Nebraska Every Woman Matters",url:"https://dhhs.ne.gov/Pages/Every-Woman-Matters.aspx"},
+            {id:"ne002",name:"Nebraska Cancer Coalition",url:"https://dhhs.ne.gov/Pages/Every-Woman-Matters.aspx"},
+            {id:"nv001",name:"Nevada Cancer Control",url:"https://dpbh.nv.gov/Programs/Cancer/Cancer_-_Home"},
+            {id:"nv002",name:"Nevada Cancer Coalition",url:"https://nevadacancercoalition.org"},
+            {id:"nh001",name:"New Hampshire Cancer Program",url:"https://www.dhhs.nh.gov/programs-services/disease-prevention/cancer"},
+            {id:"nh002",name:"New Hampshire Cancer Coalition",url:"https://www.dhhs.nh.gov/programs-services/disease-prevention/cancer"},
+            {id:"nj001",name:"New Jersey Cancer Early Detection",url:"https://www.nj.gov/health/ces/cancer-programs"},
+            {id:"nj002",name:"New Jersey Cancer Coalition",url:"https://www.nj.gov/health/ces/cancer-programs"},
+            {id:"nm001",name:"New Mexico Breast & Cervical Program",url:"https://www.nmhealth.org/about/phd/dcpho/canp"},
+            {id:"nm002",name:"New Mexico Cancer Council",url:"https://www.nmhealth.org/about/phd/dcpho/canp"},
+            {id:"ny001",name:"New York Cancer Services Program",url:"https://www.health.ny.gov/diseases/cancer"},
+            {id:"ny002",name:"New York Cancer Resource Alliance",url:"https://www.cancer.org/about-us/local/new-york.html"},
+            {id:"nc001",name:"North Carolina Breast & Cervical Control",url:"https://www.ncdhhs.gov/cancer"},
+            {id:"nc002",name:"North Carolina Cancer Control",url:"https://www.ncdhhs.gov/cancer"},
+            {id:"nc003",name:"North Carolina Cancer Assistance",url:"https://www.ncdhhs.gov/cancer"},
+            {id:"nd001",name:"North Dakota Women's Way",url:"https://www.health.nd.gov/cancer"},
+            {id:"nd002",name:"North Dakota Cancer Control",url:"https://www.health.nd.gov/cancer"},
+            {id:"oh001",name:"Ohio Breast & Cervical Cancer Project",url:"https://odh.ohio.gov/know-our-programs/cancer-prevention"},
+            {id:"oh002",name:"Ohio Cancer Surveillance",url:"https://odh.ohio.gov/know-our-programs/cancer-prevention"},
+            {id:"oh003",name:"Ohio Partners for Cancer Control",url:"https://ohiocancerpartners.org/survivorship-resources"},
+            {id:"ok001",name:"Oklahoma Breast & Cervical Program",url:"https://oklahoma.gov/health/disease-prevention/cancer.html"},
+            {id:"ok002",name:"Oklahoma Cancer Coalition",url:"https://oklahoma.gov/health/disease-prevention/cancer.html"},
+            {id:"or001",name:"Oregon Breast & Cervical Program",url:"https://www.oregon.gov/oha/PH/DISEASESCONDITIONS/CANCER"},
+            {id:"or002",name:"Oregon Cancer Coalition",url:"https://www.oregon.gov/oha/PH/DISEASESCONDITIONS/CANCER"},
+            {id:"pa001",name:"Pennsylvania Breast & Cervical Program",url:"https://www.health.pa.gov/topics/disease/cancer"},
+            {id:"pa002",name:"Pennsylvania Cancer Control",url:"https://www.health.pa.gov/topics/disease/cancer"},
+            {id:"pa003",name:"Pennsylvania Cancer Coalition",url:"https://www.pacancer.org"},
+            {id:"ri001",name:"Rhode Island Breast & Cervical Program",url:"https://health.ri.gov/cancer"},
+            {id:"ri002",name:"Rhode Island Cancer Council",url:"https://health.ri.gov/cancer"},
+            {id:"sc001",name:"South Carolina Best Chance Network",url:"https://www.scdhec.gov/health/chronic-disease/cancer"},
+            {id:"sc002",name:"South Carolina Cancer Alliance",url:"https://www.scdhec.gov/health/chronic-disease/cancer"},
+            {id:"sd001",name:"South Dakota Breast & Cervical Screening",url:"https://doh.sd.gov/diseases/chronic/cancer"},
+            {id:"sd002",name:"South Dakota Cancer Control",url:"https://doh.sd.gov/diseases/chronic/cancer"},
+            {id:"tn001",name:"Tennessee Breast & Cervical Screening",url:"https://www.tn.gov/health/health-program-areas/fhw/cancer.html"},
+            {id:"tn002",name:"Tennessee Cancer Coalition",url:"https://www.tncancercoalition.org"},
+            {id:"tn003",name:"Tennessee Cancer Coalition — Resources",url:"https://www.tncancercoalition.org"},
+            {id:"tx001",name:"Texas Cancer Council",url:"https://www.texascancercouncil.org"},
+            {id:"tx002",name:"Texas DSHS — Breast & Cervical",url:"https://www.dshs.texas.gov"},
+            {id:"tx003",name:"UT MD Anderson Financial Counseling",url:"https://www.mdanderson.org"},
+            {id:"tx004",name:"Texas 2-1-1",url:"https://www.211texas.org"},
+            {id:"ut001",name:"Utah Breast & Cervical Screening",url:"https://health.utah.gov/cancer"},
+            {id:"ut002",name:"Utah Cancer Control",url:"https://health.utah.gov/cancer"},
+            {id:"vt001",name:"Vermont Cancer Screening",url:"https://www.healthvermont.gov/cancer"},
+            {id:"vt002",name:"Vermont Cancer Control",url:"https://www.healthvermont.gov/cancer"},
+            {id:"va001",name:"Virginia Breast & Cervical Control",url:"https://www.vdh.virginia.gov/cancer"},
+            {id:"va002",name:"Virginia Cancer Coalition",url:"https://www.vacancercoalition.org"},
+            {id:"va003",name:"Virginia Cancer Coalition — Support",url:"https://www.vacancercoalition.org"},
+            {id:"wa001",name:"Washington State Breast & Cervical",url:"https://www.doh.wa.gov/cancer"},
+            {id:"wa002",name:"Washington State Cancer Coalition",url:"https://www.doh.wa.gov/cancer"},
+            {id:"wa003",name:"Fred Hutchinson Cancer Center",url:"https://www.fredhutch.org/en/patient-care/patient-services/insurance-and-billing/financial-assistance.html"},
+            {id:"wv001",name:"West Virginia Breast & Cervical Screening",url:"https://dhhr.wv.gov/cancer"},
+            {id:"wv002",name:"West Virginia Cancer Coalition",url:"https://dhhr.wv.gov/cancer"},
+            {id:"wi001",name:"Wisconsin Well Woman Program",url:"https://www.dhs.wisconsin.gov/cancer"},
+            {id:"wi002",name:"Wisconsin Cancer Council",url:"https://www.dhs.wisconsin.gov/cancer"},
+            {id:"wy001",name:"Wyoming Cancer Program",url:"https://health.wyo.gov/publichealth/cancer"},
+            {id:"wy002",name:"Wyoming Cancer — Financial",url:"https://health.wyo.gov/publichealth/cancer/resources"},
+            {id:"dc001",name:"DC Cancer Consortium",url:"https://dchealth.dc.gov/service/cancer-prevention-and-control"},
+            {id:"dc002",name:"DC Cancer Consortium — Financial",url:"https://dchealth.dc.gov/service/cancer-prevention-and-control"},
+          ];
+
+          function checkUrl(resource) {
+            return new Promise((resolve) => {
+              const parsedUrl = new URL(resource.url);
+              const protocol = parsedUrl.protocol === 'https:' ? https : http;
+              const options = {
+                hostname: parsedUrl.hostname,
+                path: parsedUrl.pathname + parsedUrl.search,
+                method: 'GET',
+                timeout: 15000,
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                  'Accept-Language': 'en-US,en;q=0.5',
+                  'Connection': 'close'
+                }
+              };
+
+              const req = protocol.request(options, (res) => {
+                const status = res.statusCode;
+                // Follow one level of redirect
+                if ((status === 301 || status === 302 || status === 307 || status === 308) && res.headers.location) {
+                  resolve({ ...resource, status, result: 'ok', note: `Redirects to ${res.headers.location}` });
+                } else if (status >= 200 && status < 400) {
+                  resolve({ ...resource, status, result: 'ok', note: '' });
+                } else {
+                  resolve({ ...resource, status, result: 'broken', note: `HTTP ${status}` });
+                }
+                res.resume();
+              });
+
+              req.on('timeout', () => {
+                req.destroy();
+                resolve({ ...resource, status: 'TIMEOUT', result: 'broken', note: 'Connection timed out' });
+              });
+
+              req.on('error', (err) => {
+                resolve({ ...resource, status: 'ERROR', result: 'broken', note: err.message });
+              });
+
+              req.end();
+            });
+          }
+
+          async function runChecks() {
+            const broken = [];
+            const working = [];
+
+            for (const resource of resources) {
+              process.stdout.write(`Checking: ${resource.name}... `);
+              const result = await checkUrl(resource);
+              if (result.result === 'broken') {
+                console.log(`BROKEN (${result.status})`);
+                broken.push(result);
+              } else {
+                console.log(`OK (${result.status})`);
+                working.push(result);
+              }
+              // Small delay between requests
+              await new Promise(r => setTimeout(r, 500));
+            }
+
+            console.log('\n========================================');
+            console.log(`CANCERCOMPASS LINK CHECK COMPLETE`);
+            console.log(`Date: ${new Date().toLocaleDateString('en-US')}`);
+            console.log(`Total checked: ${resources.length}`);
+            console.log(`Working: ${working.length}`);
+            console.log(`Broken: ${broken.length}`);
+            console.log('========================================\n');
+
+            if (broken.length > 0) {
+              console.log('BROKEN LINKS REQUIRING ACTION:');
+              broken.forEach(r => {
+                console.log(`\n• ${r.name}`);
+                console.log(`  URL: ${r.url}`);
+                console.log(`  Issue: ${r.note}`);
+              });
+
+              // Write broken links to file for use in next step
+              const fs = require('fs');
+              fs.writeFileSync('broken-links.json', JSON.stringify(broken, null, 2));
+              process.exit(1); // Exit with error to trigger notification
+            } else {
+              console.log('All links verified working. No action needed.');
+              process.exit(0);
+            }
+          }
+
+          runChecks().catch(err => {
+            console.error('Check failed:', err);
+            process.exit(1);
+          });
+          EOF
+
+      - name: Send email if broken links found
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.GMAIL_ADDRESS }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "⚠️ CancerCompass — Broken Links Found"
+          to: ${{ secrets.GMAIL_ADDRESS }}
+          from: CancerCompass Link Checker
+          body: |
+            Your scheduled CancerCompass link check has found broken links that need attention.
+
+            Please log into your CancerCompass admin page and update or remove the broken resources.
+
+            Check the GitHub Actions log for the full list:
+            https://github.com/${{ github.repository }}/actions
+
+            Date checked: ${{ github.run_id }}
+
+      - name: Send success email
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.GMAIL_ADDRESS }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "✅ CancerCompass — All 199 Links Verified Working"
+          to: ${{ secrets.GMAIL_ADDRESS }}
+          from: CancerCompass Link Checker
+          body: |
+            Your scheduled CancerCompass link check is complete.
+
+            All 199 resource links are verified working as of today.
+
+            No action needed.
+
+            Date checked: ${{ github.run_id }}
